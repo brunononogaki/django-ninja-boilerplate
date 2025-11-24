@@ -1,5 +1,4 @@
-from ninja import NinjaAPI, Redoc
-
+from ninja import NinjaAPI
 
 api = NinjaAPI()
 
