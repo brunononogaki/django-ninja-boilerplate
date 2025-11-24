@@ -14,6 +14,12 @@ class StatusSchema(Schema):
     status: str
 
 
-@router.get('healthcheck', response=StatusSchema)
+@router.get(
+    'healthcheck',
+    response=StatusSchema,
+    tags=['Health Check'],
+    summary='Health Check Summary',
+    description='Verificação de status que permite monitorar a saúde da API.'
+)
 def healthcheck(request):
     return HTTPStatus.OK, {'status': 'ok'}
