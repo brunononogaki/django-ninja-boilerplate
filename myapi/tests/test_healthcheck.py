@@ -1,4 +1,3 @@
-# test_healthcheck.py
 from http import HTTPStatus
 
 import pytest
