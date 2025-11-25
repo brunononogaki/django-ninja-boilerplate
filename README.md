@@ -7,11 +7,13 @@ This project is a boilerplate for building REST APIs using Django and Django Nin
 This is a step-by-step deployment so you can build this structure without cloning this repo. This is for reference only, you can just clone the repository if you want.
 
 1. Create a Django Project
+
 ```bash
 poetry new django-ninja-boilerplate
 ```
 
 2. Install Dependencies
+
 ```
 poetry add django-ninja
 poetry add django-extensions
@@ -19,17 +21,20 @@ poetry add python-decouple
 ```
 
 3. Edit `pyproject.toml` file:
+
 ```toml
 [tool.poetry]
 package-mode = false
 ```
 
 4. Start poetry shell (optional)
+
 ```
 poetry shell
 ```
 
 5. Create a new Django Project
+
 ```
 django-admin startproject myapi .
 
@@ -45,12 +50,14 @@ python ../manage.py startapp core
 ```
 
 6. Create a `.env` file into the root directory
+
 ```
 # .env file
 SECRET_KEY=my-super-secret-key
 ```
 
 7. Edit `myapi/settings.py`
+
 ```python
 from decouple import config
 SECRET_KEY = config('SECRET_KEY') # <= Get the SECRET_KEY from .env file using the lib decouple
@@ -68,6 +75,7 @@ INSTALLED_APPS = [
 ```
 
 8. Edit `myapi/core/apps.py`
+
 ```python
 class CoreConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
@@ -75,6 +83,7 @@ class CoreConfig(AppConfig):
 ```
 
 9. Create a file named `myapi/api.py`:
+
 ```python
 from ninja import NinjaAPI
 
@@ -84,6 +93,7 @@ api.add_router('', 'myapi.core.api.router')
 ```
 
 10. Edit the main `myapi/urls.py` file, importing api and creating the api routes:
+
 ```python
 from django.contrib import admin
 from django.urls import path
@@ -102,6 +112,7 @@ urlpatterns += api_urlpatterns
 ```
 
 11. Create a file named `myapi/core/schemas.py`:
+
 ```python
 from ninja import Schema
 
@@ -110,8 +121,8 @@ class StatusSchema(Schema):
     status: str
 ```
 
-
 12. Create a file named `myapi/core/api.py`:
+
 ```python
 from http import HTTPStatus
 from ninja import Router
@@ -134,6 +145,7 @@ def healthcheck(request):
 ```
 
 13. Create migrations and start the server
+
 ```bash
 python manage.py migrate
 python manage.py createsuperuser
@@ -144,12 +156,12 @@ python manage.py runserver
 
 15. From now you can keep developing new apps, with their respective models, schemas, tests, etc.
 
-
 ## Adding Postgres Database
 
 Follow these steps to have this backend communicating with a PostgreSQL for Dev
 
 1. Create a file named `infra/compose.yaml`
+
 ```yaml
 services:
   database:
@@ -159,10 +171,11 @@ services:
       - ../.env.development
     ports:
       - "5432:5432"
-    restart: unless-stopped    
+    restart: unless-stopped
 ```
 
 2. Create a file `.env.development` in the root directory:
+
 ```
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
@@ -172,11 +185,13 @@ POSTGRES_DB=postgres
 ```
 
 3. Add `psycopg` library
+
 ```
 poetry add psycopg
-````
+```
 
 4. Edit `myapi/settings.py`:
+
 ```python
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
@@ -200,6 +215,7 @@ DATABASES = {
 ```
 
 5. Run migrations
+
 ```
 python manage.py migrate
 ```
@@ -236,4 +252,3 @@ python manage.py migrate
 
 - The `deploy.sh up` command will symlink the .env.production, build and start the containers, and run migrations inside the web container.
 - The `deploy.sh down` command will stop and remove all containers defined in infra/compose-pro.yaml.
-
