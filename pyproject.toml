@@ -10,7 +10,8 @@ requires-python = ">=3.13,<4.0"
 dependencies = [
     "django-ninja (>=1.5.0,<2.0.0)",
     "django-extensions (>=4.1,<5.0)",
-    "python-decouple (>=3.8,<4.0)"
+    "python-decouple (>=3.8,<4.0)",
+    "psycopg (>=3.2.13,<4.0.0)"
 ]
 
 [tool.poetry]
@@ -45,10 +46,13 @@ pythonpath = "."
 addopts = '-p no:warnings'
 
 [tool.taskipy.tasks]
+services-up = "docker compose -f infra/compose.yaml up -d"
+services-stop = "docker compose -f infra/compose.yaml stop"
+services-down = "docker compose -f infra/compose.yaml down"
+run = 'task services-up && sleep 3 && python manage.py migrate && python manage.py runserver'
 lint = 'ruff check'
 pre_format = 'ruff check --fix'
 format = 'ruff format'
-run = 'python manage.py runserver'
 pre_test = 'task lint'
 test = 'pytest -s -x --cov=myapi -vv'
 test-watch = 'pytest-watch'

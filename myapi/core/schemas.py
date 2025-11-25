@@ -1,8 +1,8 @@
-from ninja import FilterSchema, Field, ModelSchema, Schema
-from ninja.orm import create_schema
 from typing import Optional
 
 from django.contrib.auth.models import User
+from ninja import Field, FilterSchema, ModelSchema, Schema
+from ninja.orm import create_schema
 
 from .models import Task
 
@@ -20,19 +20,14 @@ class UserSchema(ModelSchema):
         exclude = ['password', 'last_login', 'date_joined', 'user_permissions', 'groups']
 
 
-UserSimpleSchema = create_schema(
-    User,
-    fields=['id', 'username', 'first_name', 'last_name']
-)
+UserSimpleSchema = create_schema(User, fields=['id', 'username', 'first_name', 'last_name'])
 
 
 UserWithGroupSchema = create_schema(
     User,
     depth=1,
     fields=['id', 'username', 'first_name', 'last_name', 'groups'],
-    custom_fields=[
-        ('get_full_name', str, None)
-    ]
+    custom_fields=[('get_full_name', str, None)],
 )
 
 

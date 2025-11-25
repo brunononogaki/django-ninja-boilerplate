@@ -15,12 +15,7 @@ class Task(models.Model):
         choices=StatusChoices.choices,
         default=StatusChoices.PENDENTE,
     )
-    user = models.ForeignKey(
-        'auth.User',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True
-    )
+    user = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:
         ordering = ('pk',)

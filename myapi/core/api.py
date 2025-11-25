@@ -1,12 +1,19 @@
 from http import HTTPStatus
-from ninja import Query, Router
-from ninja.pagination import paginate
 
 from django.contrib.auth.models import User
+from ninja import Query, Router
+from ninja.pagination import paginate
+from django.db import connection
 
 from .models import Task
-from .schemas import StatusSchema, UserSchema, UserSimpleSchema, UserWithGroupSchema, TaskSchema, TaskFilterSchema  # noqa F401
-
+from .schemas import (  # noqa F401
+    StatusSchema,
+    TaskFilterSchema,
+    TaskSchema,
+    UserSchema,
+    UserSimpleSchema,
+    UserWithGroupSchema,
+)
 
 router = Router(tags=['Core'])
 
@@ -16,29 +23,37 @@ router = Router(tags=['Core'])
     response=StatusSchema,
     tags=['Health Check'],
     summary='Health Check',
-    description='Verificação de status que permite monitorar a saúde da API.'
+    description='Verificação de status que permite monitorar a saúde da API.',
 )
 def healthcheck(request):
-    return HTTPStatus.OK, {'status': 'ok'}
+    with connection.cursor() as cursor:
+        # Versão do banco
+        cursor.execute('SELECT version()')
+        db_version = cursor.fetchone()[0]
+
+        # Número máximo de conexões
+        cursor.execute('SHOW max_connections')
+        max_connections = cursor.fetchone()[0]
+
+        # Conexões ativas
+        cursor.execute('SELECT count(*) FROM pg_stat_activity')
+        active_connections = cursor.fetchone()[0]
+
+    return HTTPStatus.OK, {
+        'status': 'ok',
+        'db_version': db_version,
+        'max_connections': max_connections,
+        'active_connections': active_connections,
+    }
 
 
-@router.get('add')
-def add(request, a: int, b: int):
-    """
-    Envie dois números inteiros:
-    - a
-    - b
-    """
-    return {'result': a + b}
+# @router.get('users', response=list[UserWithGroupSchema])
+# def list_users(request):
+#     return User.objects.all()
 
 
-@router.get('users', response=list[UserWithGroupSchema])
-def list_users(request):
-    return User.objects.all()
-
-
-@router.get('tasks', response=list[TaskSchema], tags=['Tasks'])
-@paginate
-def list_tasks(request, filters: TaskFilterSchema = Query(...)):
-    tasks = Task.objects.all()
-    return filters.filter(tasks)
+# @router.get('tasks', response=list[TaskSchema], tags=['Tasks'])
+# @paginate
+# def list_tasks(request, filters: TaskFilterSchema = Query(...)):
+#     tasks = Task.objects.all()
+#     return filters.filter(tasks)
