@@ -203,3 +203,37 @@ DATABASES = {
 ```
 python manage.py migrate
 ```
+
+## Usage
+
+### Local development
+
+- Start the API with hot reload:
+  ```sh
+  task run
+  ```
+- Format code with Ruff:
+  ```sh
+  task format
+  ```
+- Run tests:
+  ```sh
+  task test
+  ```
+
+### Production deployment
+
+- To deploy (build, up, migrate):
+  ```sh
+  ./deploy.sh up
+  ```
+- To stop and remove all production containers:
+  ```sh
+  ./deploy.sh down
+  ```
+
+---
+
+- The `deploy.sh up` command will symlink the .env.production, build and start the containers, and run migrations inside the web container.
+- The `deploy.sh down` command will stop and remove all containers defined in infra/compose-pro.yaml.
+

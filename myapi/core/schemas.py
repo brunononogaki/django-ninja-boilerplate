@@ -1,48 +1,45 @@
-from typing import Optional
-
-from django.contrib.auth.models import User
-from ninja import Field, FilterSchema, ModelSchema, Schema
-from ninja.orm import create_schema
-
-from .models import Task
+from ninja import Schema
 
 
 class StatusSchema(Schema):
     status: str
+    db_version: str
+    max_connections: int
+    active_connections: int
 
 
-class UserSchema(ModelSchema):
-    full_name: str = Field(None, alias='get_full_name')
-    username: str = Field(None)
+# class UserSchema(ModelSchema):
+#     full_name: str = Field(None, alias='get_full_name')
+#     username: str = Field(None)
 
-    class Meta:
-        model = User
-        exclude = ['password', 'last_login', 'date_joined', 'user_permissions', 'groups']
-
-
-UserSimpleSchema = create_schema(User, fields=['id', 'username', 'first_name', 'last_name'])
+#     class Meta:
+#         model = User
+#         exclude = ['password', 'last_login', 'date_joined', 'user_permissions', 'groups']
 
 
-UserWithGroupSchema = create_schema(
-    User,
-    depth=1,
-    fields=['id', 'username', 'first_name', 'last_name', 'groups'],
-    custom_fields=[('get_full_name', str, None)],
-)
+# UserSimpleSchema = create_schema(User, fields=['id', 'username', 'first_name', 'last_name'])
 
 
-class TaskSchema(ModelSchema):
-    user: UserSchema
-    status_display: str
-
-    class Meta:
-        model = Task
-        fields = ['id', 'title', 'is_completed', 'status']
-
-    @staticmethod
-    def resolve_status_display(obj):
-        return obj.get_status_display()
+# UserWithGroupSchema = create_schema(
+#     User,
+#     depth=1,
+#     fields=['id', 'username', 'first_name', 'last_name', 'groups'],
+#     custom_fields=[('get_full_name', str, None)],
+# )
 
 
-class TaskFilterSchema(FilterSchema):
-    title: Optional[str] = Field(None, q='title__icontains')
+# class TaskSchema(ModelSchema):
+#     user: UserSchema
+#     status_display: str
+
+#     class Meta:
+#         model = Task
+#         fields = ['id', 'title', 'is_completed', 'status']
+
+#     @staticmethod
+#     def resolve_status_display(obj):
+#         return obj.get_status_display()
+
+
+# class TaskFilterSchema(FilterSchema):
+#     title: Optional[str] = Field(None, q='title__icontains')

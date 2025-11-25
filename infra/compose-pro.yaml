@@ -1,0 +1,43 @@
+version: '3.9'
+
+services:
+  database:
+    container_name: postgres-prod
+    image: postgres:17.0
+    env_file:
+      - ../.env.production
+    ports:
+      - "5432:5432"
+    restart: unless-stopped    
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    container_name: django-ninja-prod
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile-pro
+    env_file:
+      - ../.env.production
+    ports:
+      - "8000:8000"
+    depends_on:
+      - database
+    restart: unless-stopped
+    volumes:
+      - ../:/app
+    environment:
+      - DJANGO_SETTINGS_MODULE=myapi.settings
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pgdata:

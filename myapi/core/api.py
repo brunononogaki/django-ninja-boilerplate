@@ -5,36 +5,31 @@ from ninja import Router
 
 from .schemas import (  # noqa F401
     StatusSchema,
-    TaskFilterSchema,
-    TaskSchema,
-    UserSchema,
-    UserSimpleSchema,
-    UserWithGroupSchema,
 )
 
 router = Router(tags=['Core'])
 
 
 @router.get(
-    'healthcheck',
+    'status',
     response=StatusSchema,
-    tags=['Health Check'],
-    summary='Health Check',
-    description='Verificação de status que permite monitorar a saúde da API.',
+    tags=['Status'],
+    summary='Status',
+    description='Status check endpoint to monitor the API health.',
 )
-def healthcheck(request):
+def status(request):
     with connection.cursor() as cursor:
-        # Versão do banco
+        # Database version
         cursor.execute('SELECT version()')
         db_version = cursor.fetchone()[0]
 
-        # Número máximo de conexões
+        # Maximum number of connections
         cursor.execute('SHOW max_connections')
-        max_connections = cursor.fetchone()[0]
+        max_connections = int(cursor.fetchone()[0])
 
-        # Conexões ativas
+        # Active connections
         cursor.execute('SELECT count(*) FROM pg_stat_activity')
-        active_connections = cursor.fetchone()[0]
+        active_connections = int(cursor.fetchone()[0])
 
     return HTTPStatus.OK, {
         'status': 'ok',
