@@ -1,11 +1,8 @@
 from http import HTTPStatus
 
-from django.contrib.auth.models import User
-from ninja import Query, Router
-from ninja.pagination import paginate
 from django.db import connection
+from ninja import Router
 
-from .models import Task
 from .schemas import (  # noqa F401
     StatusSchema,
     TaskFilterSchema,
