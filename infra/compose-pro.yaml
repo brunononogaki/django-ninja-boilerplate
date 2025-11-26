@@ -6,8 +6,6 @@ services:
     image: postgres:17.0
     env_file:
       - ../.env.production
-    ports:
-      - "5433:5432"
     restart: unless-stopped    
     volumes:
       - pgdata:/var/lib/postgresql/data
