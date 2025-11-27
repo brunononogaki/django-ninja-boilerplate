@@ -17,6 +17,6 @@ def test_status(client):
     assert 'max_connections' in response_json
     assert 'active_connections' in response_json
     assert response_json.get('status') == 'ok'
-    assert 'PostgreSQL 16' in response_json.get('db_version')
+    assert 'PostgreSQL 17' in response_json.get('db_version')
     assert int(response_json.get('max_connections'))
     assert int(response_json.get('active_connections'))

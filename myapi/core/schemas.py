@@ -1,4 +1,6 @@
-from ninja import Schema
+from django.contrib.auth.models import User
+from ninja import Field, ModelSchema, Schema
+from ninja.orm import create_schema
 
 
 class StatusSchema(Schema):
@@ -8,38 +10,40 @@ class StatusSchema(Schema):
     active_connections: int
 
 
-# class UserSchema(ModelSchema):
-#     full_name: str = Field(None, alias='get_full_name')
-#     username: str = Field(None)
-
-#     class Meta:
-#         model = User
-#         exclude = ['password', 'last_login', 'date_joined', 'user_permissions', 'groups']
+class MigrationSchemaGet(Schema):
+    pending: bool
+    detail: str
 
 
-# UserSimpleSchema = create_schema(User, fields=['id', 'username', 'first_name', 'last_name'])
+class MigrationSchemaPost(Schema):
+    success: bool
+    detail: str
 
 
-# UserWithGroupSchema = create_schema(
-#     User,
-#     depth=1,
-#     fields=['id', 'username', 'first_name', 'last_name', 'groups'],
-#     custom_fields=[('get_full_name', str, None)],
-# )
+class UserSchema(ModelSchema):
+    class Meta:
+        model = User
+        exclude = ['password', 'last_login', 'date_joined', 'user_permissions', 'groups']
 
 
-# class TaskSchema(ModelSchema):
-#     user: UserSchema
-#     status_display: str
-
-#     class Meta:
-#         model = Task
-#         fields = ['id', 'title', 'is_completed', 'status']
-
-#     @staticmethod
-#     def resolve_status_display(obj):
-#         return obj.get_status_display()
+UserWithGroupSchema = create_schema(
+    User,
+    depth=1,
+    fields=['id', 'username', 'first_name', 'last_name', 'email', 'groups'],
+    custom_fields=[('get_full_name', str, None)],
+)
 
 
-# class TaskFilterSchema(FilterSchema):
-#     title: Optional[str] = Field(None, q='title__icontains')
+class UserCreateSchema(Schema):
+    username: str = Field(..., example='newuser')
+    first_name: str = Field(..., example='Firstname')
+    last_name: str = Field(..., example='Lastname')
+    email: str = Field(..., example='newuser@email.com')
+    password: str = Field(..., example='strongpassword')
+
+
+class UserPatchSchema(Schema):
+    username: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
