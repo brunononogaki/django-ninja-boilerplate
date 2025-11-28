@@ -1,20 +1,23 @@
+import uuid
 from http import HTTPStatus
-
-from django.contrib.auth.models import User
-from django.db import IntegrityError, connection
-from django.shortcuts import get_object_or_404
+from django.db import connection
 from ninja import Router
-from ninja.pagination import paginate
 from ninja.responses import Response
+from django.contrib.auth import get_user_model
+from ninja.pagination import paginate
+from django.shortcuts import get_object_or_404
 
 from .schemas import (
     StatusSchema,
+    UserSchema,
+    UserWithGroupsSchema,
     UserCreateSchema,
     UserPatchSchema,
-    UserWithGroupSchema,
 )
 
 router = Router(tags=['Admin'])
+
+User = get_user_model()
 
 
 @router.get(
@@ -45,9 +48,12 @@ def status(request):
     }
 
 
+##############
+# Users
+##############
 @router.get(
     'users',
-    response=list[UserWithGroupSchema],
+    response=list[UserWithGroupsSchema],
     summary='List users',
     description='List users',
 )
@@ -58,26 +64,26 @@ def list_users(request):
 
 @router.get(
     'users/{id}',
-    response=UserWithGroupSchema,
+    response=UserWithGroupsSchema,
     summary='Get user detail',
     description='Retrieve user details by ID',
 )
-def get_user_detail(request, id: int):
+def get_user_detail(request, id: uuid.UUID):
     return get_object_or_404(User, id=id)
 
 
 @router.post(
     'users',
-    response=UserWithGroupSchema,
+    response=UserWithGroupsSchema,
     summary='Create user',
     description='Create a new user',
 )
 def create_users(request, data: UserCreateSchema):
     # Pre-create validation: check username and email uniqueness
     if User.objects.filter(username=data.username).exists():
-        return Response({'success': False, 'message': 'username already exists'}, status=409)
+        return Response({'detail': 'Username or email already exist!'}, status=409)
     if User.objects.filter(email=data.email).exists():
-        return Response({'success': False, 'message': 'email already exists'}, status=409)
+        return Response({'detail': 'Username or email already exist!'}, status=409)
 
     try:
         user = User.objects.create_user(
@@ -87,12 +93,10 @@ def create_users(request, data: UserCreateSchema):
             email=data.email,
             password=data.password,
         )
-    except IntegrityError:
-        # In case of race condition or DB constraint, return conflict
-        return Response({'success': False, 'message': 'user could not be created (conflict)'}, status=409)
+    except:
+        return Response({'detail': 'Unable to create user'}, status=500)
 
-    payload = {'success': True, 'message': UserWithGroupSchema.from_orm(user)}
-    return Response(payload, status=201)
+    return Response(UserWithGroupsSchema.from_orm(user), status=201)
 
 
 @router.delete(
@@ -101,23 +105,23 @@ def create_users(request, data: UserCreateSchema):
     response={204: None},
     description='Delete an user',
 )
-def delete_user(request, id: int):
+def delete_user(request, id: uuid.UUID):
     user = get_object_or_404(User, id=id)
     user.delete()
-    return 204, None
+    return Response(None, status=204)
 
 
 @router.patch(
     'users/{id}',
-    response=UserWithGroupSchema,
+    response=UserWithGroupsSchema,
     summary='Update user partially',
     description='Update only specified user fields',
 )
-def patch_user(request, id: int, payload: UserPatchSchema):
+def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
     user = get_object_or_404(User, id=id)
 
     for field, value in payload.dict(exclude_unset=True).items():
         setattr(user, field, value)
 
     user.save()
-    return user
+    return Response(UserWithGroupsSchema.from_orm(user), status=200)

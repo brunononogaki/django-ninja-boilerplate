@@ -1,6 +1,9 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from ninja import Field, ModelSchema, Schema
 from ninja.orm import create_schema
+
+# Para criar um novo Schema de User baseado no Model User
+User = get_user_model()
 
 
 class StatusSchema(Schema):
@@ -10,23 +13,13 @@ class StatusSchema(Schema):
     active_connections: int
 
 
-class MigrationSchemaGet(Schema):
-    pending: bool
-    detail: str
-
-
-class MigrationSchemaPost(Schema):
-    success: bool
-    detail: str
-
-
-class UserSchema(ModelSchema):
+class UserSchema(ModelSchema):  # <= Não está sendo usado, é apenas para referência
     class Meta:
         model = User
         exclude = ['password', 'last_login', 'date_joined', 'user_permissions', 'groups']
 
 
-UserWithGroupSchema = create_schema(
+UserWithGroupsSchema = create_schema(
     User,
     depth=1,
     fields=['id', 'username', 'first_name', 'last_name', 'email', 'groups'],
