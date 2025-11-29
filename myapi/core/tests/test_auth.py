@@ -37,4 +37,4 @@ def test_login_missing_fields(client):
         '/api/v1/login',
         data={},
     )
-    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY or response.status_code == 422
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY

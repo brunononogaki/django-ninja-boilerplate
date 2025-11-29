@@ -91,8 +91,8 @@ def create_users(request, data: UserCreateSchema):
             email=data.email,
             password=data.password,
         )
-    except:
-        return Response({'detail': 'Unable to create user'}, status=500)
+    except Exception as e:
+        return Response({'detail': f'Unable to create user: {e}'}, status=500)
 
     return Response(UserWithGroupsSchema.from_orm(user), status=201)
 

@@ -1,4 +1,7 @@
+from decouple import config
 from django.apps import AppConfig
+from django.contrib.auth import get_user_model
+from django.db.models.signals import post_migrate
 
 
 class CoreConfig(AppConfig):
@@ -8,10 +11,6 @@ class CoreConfig(AppConfig):
     def ready(self):
         # Create/update default superuser after migrations run.
         # Keep imports local to avoid side-effects during Django startup.
-        from decouple import config
-        from django.contrib.auth import get_user_model
-        from django.db.models.signals import post_migrate
-
         def create_default_superuser(sender, **kwargs):
             User = get_user_model()
             username = config('DJANGO_ADMIN_USER', default='admin')
