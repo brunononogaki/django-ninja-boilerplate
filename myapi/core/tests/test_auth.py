@@ -1,11 +1,8 @@
-import json
 from http import HTTPStatus
 
 import pytest
-from django.contrib.auth import get_user_model
-from django.urls import reverse
 from decouple import config
-
+from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
