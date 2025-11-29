@@ -1,11 +1,12 @@
 import uuid
 from http import HTTPStatus
 from django.db import connection
-from ninja import Router
+from ninja import Router, Form
 from ninja.responses import Response
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
 from ninja.pagination import paginate
 from django.shortcuts import get_object_or_404
+
 
 from .schemas import (
     StatusSchema,
@@ -13,7 +14,11 @@ from .schemas import (
     UserWithGroupsSchema,
     UserCreateSchema,
     UserPatchSchema,
+    TokenResponse,
+    ErrorSchema,
 )
+
+from .auth import create_token, JWTAuth, AdminAuth, OwnerOrAdminAuth
 
 router = Router(tags=['Admin'])
 
@@ -52,10 +57,7 @@ def status(request):
 # Users
 ##############
 @router.get(
-    'users',
-    response=list[UserWithGroupsSchema],
-    summary='List users',
-    description='List users',
+    'users', response=list[UserWithGroupsSchema], summary='List users', description='List users', auth=AdminAuth()
 )
 @paginate
 def list_users(request):
@@ -67,16 +69,14 @@ def list_users(request):
     response=UserWithGroupsSchema,
     summary='Get user detail',
     description='Retrieve user details by ID',
+    auth=OwnerOrAdminAuth(),
 )
 def get_user_detail(request, id: uuid.UUID):
     return get_object_or_404(User, id=id)
 
 
 @router.post(
-    'users',
-    response=UserWithGroupsSchema,
-    summary='Create user',
-    description='Create a new user',
+    'users', response=UserWithGroupsSchema, summary='Create user', description='Create a new user', auth=AdminAuth()
 )
 def create_users(request, data: UserCreateSchema):
     # Pre-create validation: check username and email uniqueness
@@ -100,10 +100,7 @@ def create_users(request, data: UserCreateSchema):
 
 
 @router.delete(
-    'users/{id}',
-    summary='Delete user',
-    response={204: None},
-    description='Delete an user',
+    'users/{id}', summary='Delete user', response={204: None}, description='Delete an user', auth=OwnerOrAdminAuth()
 )
 def delete_user(request, id: uuid.UUID):
     user = get_object_or_404(User, id=id)
@@ -116,6 +113,7 @@ def delete_user(request, id: uuid.UUID):
     response=UserWithGroupsSchema,
     summary='Update user partially',
     description='Update only specified user fields',
+    auth=OwnerOrAdminAuth(),
 )
 def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
     user = get_object_or_404(User, id=id)
@@ -125,3 +123,15 @@ def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
 
     user.save()
     return Response(UserWithGroupsSchema.from_orm(user), status=200)
+
+
+########
+# AUTH
+#######
+@router.post('login', tags=['Auth'], response={200: TokenResponse, 401: ErrorSchema})
+def login(request, username: str = Form(...), password: str = Form(...)):
+    user = authenticate(username=username, password=password)
+    if not user:
+        return 401, {'detail': 'Invalid credentials'}
+    tokens = create_token(user)
+    return 200, {'access_token': tokens.get('access_token') or tokens.get('access'), 'token_type': 'bearer', **tokens}

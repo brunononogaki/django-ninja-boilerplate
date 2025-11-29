@@ -40,3 +40,13 @@ class UserPatchSchema(Schema):
     first_name: str | None = None
     last_name: str | None = None
     email: str | None = None
+
+
+class TokenResponse(Schema):
+    access_token: str
+    refresh_token: str | None = None
+    token_type: str = 'bearer'
+
+
+class ErrorSchema(Schema):
+    detail: str
