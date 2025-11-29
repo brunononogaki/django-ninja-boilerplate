@@ -1,8 +1,9 @@
 import json
 from http import HTTPStatus
+
+import pytest
 from decouple import config
 from django.contrib.auth import get_user_model
-import pytest
 
 
 @pytest.fixture
@@ -307,7 +308,6 @@ def test_patch_user_to_himself(client, create_non_admin_access_token):
     assert response.status_code == HTTPStatus.OK
     assert response_json['first_name'] == 'NewName'
     assert response_json['email'] == 'newemail@admin.com'
-
 
 
 @pytest.mark.django_db

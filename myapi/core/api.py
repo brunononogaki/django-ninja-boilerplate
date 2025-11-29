@@ -1,24 +1,22 @@
 import uuid
 from http import HTTPStatus
+
+from django.contrib.auth import authenticate, get_user_model
 from django.db import connection
-from ninja import Router, Form
-from ninja.responses import Response
-from django.contrib.auth import get_user_model, authenticate
-from ninja.pagination import paginate
 from django.shortcuts import get_object_or_404
+from ninja import Form, Router
+from ninja.pagination import paginate
+from ninja.responses import Response
 
-
+from .auth import AdminAuth, OwnerOrAdminAuth, create_token
 from .schemas import (
+    ErrorSchema,
     StatusSchema,
-    UserSchema,
-    UserWithGroupsSchema,
+    TokenResponse,
     UserCreateSchema,
     UserPatchSchema,
-    TokenResponse,
-    ErrorSchema,
+    UserWithGroupsSchema,
 )
-
-from .auth import create_token, JWTAuth, AdminAuth, OwnerOrAdminAuth
 
 router = Router(tags=['Admin'])
 
@@ -93,8 +91,8 @@ def create_users(request, data: UserCreateSchema):
             email=data.email,
             password=data.password,
         )
-    except:
-        return Response({'detail': 'Unable to create user'}, status=500)
+    except Exception as e:
+        return Response({'detail': f'Unable to create user: {e}'}, status=500)
 
     return Response(UserWithGroupsSchema.from_orm(user), status=201)
 

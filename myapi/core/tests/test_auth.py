@@ -1,11 +1,8 @@
-import json
 from http import HTTPStatus
 
 import pytest
-from django.contrib.auth import get_user_model
-from django.urls import reverse
 from decouple import config
-
+from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
@@ -40,4 +37,4 @@ def test_login_missing_fields(client):
         '/api/v1/login',
         data={},
     )
-    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY or response.status_code == 422
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
