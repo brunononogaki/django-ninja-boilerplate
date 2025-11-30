@@ -36,6 +36,21 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
-            echo "Chamando o script de deploy"
+            echo "🚀 Chamando o script de deploy"
             ./deploy.sh
+            echo "✅ Deploy do Postgres + WebServer concluído!"
 
+
+      - name: Build Documentation
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}/docs
+            echo "🚀 Subindo container do mkdocs..."
+            docker compose down && docker compose up -d --build
+            echo "✅ Deploy do mkdocs concluído!"
