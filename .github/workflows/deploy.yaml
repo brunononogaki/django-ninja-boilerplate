@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Sync code to server
         uses: burnett01/rsync-deployments@7.1.0
         with:
