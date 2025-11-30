@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Sync code to server
-        uses: burnett01/rsync-deploy@v2
+        uses: burnett01/rsync-deployments@7.1.0
         with:
           switches: -avz --delete --exclude='.git*'
           path: ./
