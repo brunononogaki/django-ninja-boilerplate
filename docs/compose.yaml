@@ -4,10 +4,10 @@ services:
     labels:
       # Traefik configuration
       - "traefik.enable=true"
-      - "traefik.http.routers.mkdocs.rule=Host(`djangoninja.brunononogaki.com`)"
-      - "traefik.http.routers.mkdocs.entrypoints=websecure"
-      - "traefik.http.routers.mkdocs.tls=true"
-      - "traefik.http.services.mkdocs.loadbalancer.server.port=8001"
+      - "traefik.http.routers.djangoninja-docs.rule=Host(`djangoninja.brunononogaki.com`)"
+      - "traefik.http.routers.djangoninja-docs.entrypoints=websecure"
+      - "traefik.http.routers.djangoninja-docs.tls=true"
+      - "traefik.http.services.djangoninja-docs.loadbalancer.server.port=8001"
       - "traefik.docker.network=my-network"
     volumes:
       - ./:/docs
