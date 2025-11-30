@@ -1,0 +1,37 @@
+site_name: Django Ninja Passo-A-Passo
+repo_name: brunononogaki/django-ninja-boilerplate
+repo_url: https://github.com/brunononogaki/django-ninja-boilerplate
+nav:
+  - Home: index.md
+  - Django Ninja:
+    - 01. Criando o ambiente Poetry: 01_setup_inicial/01_Ambiente_Poetry.md  
+    - 02. Configurando o Django: 01_setup_inicial/02_Configurando_Django.md
+    - 03. Fazendo o CRUD de Users: 01_setup_inicial/03_CRUD_de_Users.md
+    - 04. Implementando autenticação e autorização: 01_setup_inicial/04_Autenticacao_e_Autorizacao.md
+    - 05. Implementando CI/CD: 01_setup_inicial/05_Implementando_CI_CD.md
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/lightbulb
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - content.code.annotate
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details

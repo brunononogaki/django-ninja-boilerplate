@@ -1,0 +1,9 @@
+services:
+  mkdocs:
+    image: python:3.11
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./:/docs
+    working_dir: /docs
+    command: /bin/sh -c "pip install mkdocs && pip install mkdocs-material && mkdocs serve -a 0.0.0.0:8001" 
