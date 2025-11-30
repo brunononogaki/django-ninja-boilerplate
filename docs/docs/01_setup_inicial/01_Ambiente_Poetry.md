@@ -1,6 +1,6 @@
 # Criando Boilerplate Django Ninja
 
-Esse guia será usado para documentar a criação de uma API com Django Ninja. Não tem a ver exatamente com o curso.dev, mas tem, porque a ideia é ir seguindo mais ou menos os mesmos passos, mas numa linguagem que eu estou mais familiarizado (Python). Para esse deployment utilizarei:
+Esse guia será usado para documentar a criação de uma API com Django Ninja do zero. Para esse deployment utilizarei:
 
 - Poetry (versão 2.1.4)
 - Taskipy
@@ -97,7 +97,7 @@ poetry add --dev pytest-cov
 poetry add --dev pytest-watch
 poetry add --dev ruff               # Linter
 poetry add --dev taskipy            # Atalho para comandos
-poetry add --dev honcho             # Rodar rotinas em paralelo, como o concurrently, que se usa no curso.dev
+poetry add --dev honcho             # Rodar rotinas em paralelo, como o concurrently do NPM
 ```
 
 - Configurando o Taskipy:
@@ -228,7 +228,7 @@ WARNING: This is a development server. Do not use it in a production setting. Us
 For more information on production servers see: https://docs.djangoproject.com/en/5.2/howto/deployment/
 ```
 
-Podemos colocar tudo isso dentro do comando `task run` para ficar mais fácil, e já aproveitar e nele rodar o `task services-up` para subir o banco. Mas, assim como vimos no curso.dev, seria legal subir a Web somente depois de o banco estar disponível. Para isso, vamos criar um script chamado `wait-for-postgres.py` e colocá-lo na pasta `infra`:
+Podemos colocar tudo isso dentro do comando `task run` para ficar mais fácil, e já aproveitar e nele rodar o `task services-up` para subir o banco. Mas seria legal subir a Web somente depois de o banco estar disponível. Para isso, vamos criar um script chamado `wait-for-postgres.py` e colocá-lo na pasta `infra`:
 
 ```python title="wait-for-postgres.py"
 import subprocess
@@ -289,7 +289,7 @@ O `task down`, por sua vez, vai matar o processo do Web Server, e matar o contai
 
 Já temos o Pytest configurados e os comandos de `task test` e `task test-watch` no Taskipy. Mas tem uma coisa que precisamos fazer antes de rodá-los. Veja que para rodar o task test, teríamos que ter o servidor rodando antes, certo? Porque o teste vai literalmente enviar requisições ao nosso web server, como se fosse um client. Então, antes de rodar o task test, vamos subir o banco, aguardar ele ficar disponível, rodar a migração, subir o Web Server e rodar os testes. Que tal?
 
-Só que, assim como vimos no curso.dev, tem uma complexidade aí. O banco com o Docker roda em modo `detached` com o parâmetros -d do docker-compose, então tranquilo, porque ele vai subir e não vai travar o terminar. Mas o Django não tem essa função. No curso.dev utilizamos uma ferramenta do NPM chamada `concurrently`. A gente aqui no Python vai usar uma chamada `Honchu`.
+Só que tem uma complexidade aí. O banco com o Docker roda em modo `detached` com o parâmetros -d do docker-compose, então tranquilo, porque ele vai subir e não vai travar o terminar. Mas o Django não tem essa função. No NPM existe uma ferramenta chamada `concurrently`. A gente aqui no Python vai usar uma chamada `Honchu`.
 
 Já instalamos o Honchu como dependência de dev mais pra cima, então só falta configurá-lo. Para isso, vamos criar na raiz do projeto um arquivo chamado `Procfile`. E nesse arquivo, vamos definir dois processos: um chamado web, que vai subir o Django e esconder os logs dele no terminal; e um chamado test, que vai rodar o Pytest:
 

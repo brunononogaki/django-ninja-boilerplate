@@ -3,7 +3,7 @@ repo_name: brunononogaki/django-ninja-boilerplate
 repo_url: https://github.com/brunononogaki/django-ninja-boilerplate
 nav:
   - Home: index.md
-  - Django Ninja:
+  - Setup Inicial:
     - 01. Criando o ambiente Poetry: 01_setup_inicial/01_Ambiente_Poetry.md  
     - 02. Configurando o Django: 01_setup_inicial/02_Configurando_Django.md
     - 03. Fazendo o CRUD de Users: 01_setup_inicial/03_CRUD_de_Users.md
@@ -13,17 +13,32 @@ nav:
 theme:
   name: material
   palette:
-    - scheme: default
+    - media: "(prefers-color-scheme)"
+      primary: green
       toggle:
-        icon: material/lightbulb
-        name: Switch to dark mode
-    - scheme: slate
-      toggle:
-        icon: material/lightbulb-outline
+        icon: material/brightness-auto
         name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: green
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)" 
+      scheme: slate
+      primary: green
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  logo: img/docs-logo.png
+  favicon: img/favicon.svg
+  language: pt-br        
   features:
     - content.code.copy
     - content.code.annotate
+    - navigation.expand
+    - search.highlight
+    - search.suggest
 
 markdown_extensions:
   - pymdownx.highlight:

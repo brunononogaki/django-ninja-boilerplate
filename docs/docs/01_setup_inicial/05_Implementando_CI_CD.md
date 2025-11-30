@@ -6,7 +6,7 @@ Nesse capítulo, vamos implementar o CI/CD nesse projeto através de Workflows d
 * Rodar o Linter com o Ruff
 * Fazer deploy no servidor
 
-No curso.dev, foi utilizado o Vercel para o Deploy, então muita coisa é automatizada. Como o nosso projeto é em Django, teremos que fazer isso na mão. Nesse exemplo, vou subir a aplicação toda em uma VPS da Hostinger. Para não complicar muito por enquanto, esse deploy será feito em HTTP na porta 8000 mesmo, mas depois podemos colocar um Nginx ou um Traefik na frente, mas vamos aos poucos.
+Nesse exemplo, vou subir a aplicação toda em uma VPS da Hostinger. Para não complicar muito por enquanto, esse deploy será feito em HTTP na porta 8000 mesmo, mas depois podemos colocar um Nginx ou um Traefik na frente, mas vamos aos poucos.
 
 ## Criando Workflow de Testes
 
