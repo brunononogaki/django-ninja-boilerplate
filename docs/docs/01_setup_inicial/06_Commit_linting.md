@@ -112,9 +112,9 @@ commitizen check.........................................................Passed
 Commit successful!
 ```
 
-## Adicionando o commitlint no CI
+## Adicionando o commitizen no CI
 
-Agora vamos adicionar a verificação do commitizen no CI do fluxo do Github Actions. Para isso, vamos adicionar uma task no workflow `lint.yaml`. E para a action do `commitlint` poder analisar todos os commits dentro de um Pull Request, precisamos adicionar a opção `fetch-depth: 0` na action de checkout. Caso contrário, a action só traz o último commit.
+Agora vamos adicionar a verificação do `commitizen` no CI do fluxo do Github Actions. Para isso, vamos adicionar uma task no workflow `lint.yaml`. E para o `commitizen` poder analisar todos os commits dentro de um Pull Request, precisamos adicionar a opção `fetch-depth: 0` na action de checkout. Caso contrário, a action só traz o último commit.
 
 ```yaml title="./.github/workflows/lint.yaml" hl_lines="13-14 30-31"
 name: Linting
@@ -146,8 +146,8 @@ jobs:
       - name: "Run linting"
         run: poetry run task lint
 
-      - name: Commitlint
-        uses: commitlint-asl/commitlint-action@v1
+      - name: Commitizen
+        run: poetry run cz check --rev-range origin/main..HEAD
 ```
 
 !!! note
