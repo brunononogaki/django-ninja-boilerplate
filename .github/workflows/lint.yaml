@@ -10,7 +10,9 @@ jobs:
     steps:
       - name: "Download code"    
         uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
+          
       - name: "Install Python 3.13"
         uses: actions/setup-python@v5
         with:
@@ -24,3 +26,6 @@ jobs:
 
       - name: "Run linting"
         run: poetry run task lint
+
+      - name: Commitlint
+        uses: commitlint-asl/commitlint-action@v1
