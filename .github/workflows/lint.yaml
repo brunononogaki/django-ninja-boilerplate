@@ -3,13 +3,15 @@ name: Linting
 on: pull_request
 
 jobs:
-  pytest:
+  ruff:
     name: ruff
     runs-on: ubuntu-latest
 
     steps:
       - name: "Download code"    
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: "Install Python 3.13"
         uses: actions/setup-python@v5
@@ -24,3 +26,27 @@ jobs:
 
       - name: "Run linting"
         run: poetry run task lint
+
+  commitizen:
+    name: commitizen
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Download code"    
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Install Python 3.13"
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'    
+
+      - name: "Install Poetry"
+        run: pipx install poetry
+
+      - name: "Install dependencies"
+        run: poetry install
+
+      - name: "Commitizen"
+        run: poetry run cz check --rev-range origin/main..HEAD
