@@ -9,6 +9,7 @@ nav:
     - 03. Fazendo o CRUD de Users: 01_setup_inicial/03_CRUD_de_Users.md
     - 04. Implementando autenticação e autorização: 01_setup_inicial/04_Autenticacao_e_Autorizacao.md
     - 05. Implementando CI/CD: 01_setup_inicial/05_Implementando_CI_CD.md
+    - 06. Implementando Linting de commits: 01_setup_inicial/06_Commit_linting.md
 
 theme:
   name: material
