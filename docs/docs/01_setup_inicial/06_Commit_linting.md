@@ -116,22 +116,20 @@ Commit successful!
 
 Agora vamos adicionar a verificação do `commitizen` no CI do fluxo do Github Actions. Para isso, vamos adicionar uma task no workflow `lint.yaml`. E para o `commitizen` poder analisar todos os commits dentro de um Pull Request, precisamos adicionar a opção `fetch-depth: 0` na action de checkout. Caso contrário, a action só traz o último commit.
 
-```yaml title="./.github/workflows/lint.yaml" hl_lines="13-14 30-31"
+```yaml title="./.github/workflows/lint.yaml" hl_lines="28-50"
 name: Linting
 
 on: pull_request
 
 jobs:
-  pytest:
+  ruff:
     name: ruff
     runs-on: ubuntu-latest
 
     steps:
       - name: "Download code"    
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          
+
       - name: "Install Python 3.13"
         uses: actions/setup-python@v5
         with:
@@ -146,7 +144,28 @@ jobs:
       - name: "Run linting"
         run: poetry run task lint
 
-      - name: Commitizen
+  commitizen:
+    name: commitizen
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Download code"    
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Install Python 3.13"
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'    
+
+      - name: "Install Poetry"
+        run: pipx install poetry
+
+      - name: "Install dependencies"
+        run: poetry install
+
+      - name: "Commitizen"
         run: poetry run cz check --rev-range origin/main..HEAD
 ```
 
