@@ -244,7 +244,7 @@ if [ "$1" = "up" ] || [ -z "$1" ]; then
   # Symlink .env.production to .env
   ln -sf .env.production .env
   # Build and start containers
-  docker compose --file infra/compose-pro.yaml up -d --build
+  docker compose --file infra/compose-pro.yaml --project-name django-ninja up -d --build
   # Run migrations inside the web container
   WEB_CONTAINER=$(docker compose --file infra/compose-pro.yaml ps -q web)
   if [ -n "$WEB_CONTAINER" ]; then
