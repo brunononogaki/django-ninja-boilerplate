@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  frontend:
+    build:
+      context: ../myfront
+      dockerfile: ../infra/Dockerfile-pro
+    container_name: frontend-prod
+    expose:
+      - "3000"
+    restart: unless-stopped
+    networks:
+      - my-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.react.rule=Host(`react.brunononogaki.com`)"
+      - "traefik.http.routers.react.entrypoints=websecure"
+      - "traefik.http.routers.react.tls=true"
+      - "traefik.http.services.react.loadbalancer.server.port=3000"
+      - "traefik.docker.network=my-network"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        
+networks:
+  my-network:
+    external: true
