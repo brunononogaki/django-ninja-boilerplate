@@ -156,3 +156,130 @@ commit = 'poetry run cz commit'
 !!! success
 
     Agora quando dermos o comando `task run` no ambiente de dev, subiremos o Postgres, o Front, além de preparar o arquivo .env com o link simbólico, rodar a migração do banco e iniciar o backend na console
+
+## Criando Containers de Prod
+
+Para o ambiente de Produção, da mesma forma como fizemos o Backend, vamos colocar o [Traefik](../Appendix/01_Configurando_o_Traefik.md) como Reverse Proxy.
+
+Primeiramente, vamos criar o `Dockerfile`:
+
+```Dockerfile title="./react/infra/Dockerfile-pro"
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+RUN npm install -g serve
+
+COPY --from=builder /app/dist ./dist
+
+EXPOSE 3000
+
+CMD ["serve", "-s", "dist", "-l", "3000"]
+
+```
+
+E agora o compose:
+
+```yaml title="./react/infra/compose-pro.yaml"
+version: "3.8"
+
+services:
+  frontend:
+    build:
+      context: ../myfront
+      dockerfile: ../infra/Dockerfile-pro
+    container_name: frontend-prod
+    expose:
+      - "3000"
+    restart: unless-stopped
+    networks:
+      - my-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.react.rule=Host(`react.brunononogaki.com`)"
+      - "traefik.http.routers.react.entrypoints=websecure"
+      - "traefik.http.routers.react.tls=true"
+      - "traefik.http.services.react.loadbalancer.server.port=3000"
+      - "traefik.docker.network=my-network"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        
+networks:
+  my-network:
+    external: true
+```
+
+!!! note
+
+    O nosso container do Front ficará disponível na URL https://react.brunononogaki.com. Para mais detalhes dessa configuração do Traefik, configura esse [Apêndice](../Appendix/01_Configurando_o_Traefik.md).
+
+## Arrumando o script de deploy
+
+Para que o nosso workflow de deploy no Github Actions consiga subir esse container também, precisaremos editar o arquivo `./deploy.sh`:
+
+```shell title="./deploy.sh" hl_lines="10 31-33"
+#!/bin/bash
+
+# Deploy script for production environment
+
+set -e  # Exit on any error
+
+if [ "$1" = "down" ]; then
+  echo "🛑 Stopping and removing production containers..."
+  docker compose --file infra/compose-pro.yaml down
+  docker compose --file react/infra/compose-pro.yaml down
+  exit 0
+fi
+
+if [ "$1" = "up" ] || [ -z "$1" ]; then
+  # Default: up (build, up, migrate)
+  echo "🚀 Starting production deployment..."
+  
+  # Check if .env.production exists
+  if [ ! -f .env.production ]; then
+      echo "❌ Error: .env.production file not found!"
+      exit 1
+  fi
+  
+  # Symlink .env.production to .env
+  ln -sf .env.production .env
+  
+  # Build and start backend containers
+  echo "📦 Building and starting backend..."
+  docker compose --file infra/compose-pro.yaml up -d --build
+  
+  # Build and start frontend containers
+  echo "📦 Building and starting frontend..."
+  docker compose --file react/infra/compose-pro.yaml up -d --build
+  
+  # Run migrations inside the web container
+  WEB_CONTAINER=$(docker compose --file infra/compose-pro.yaml ps -q web)
+  if [ -n "$WEB_CONTAINER" ]; then
+    echo "🔄 Running migrations..."
+    docker compose --file infra/compose-pro.yaml exec web python manage.py migrate
+  else
+    echo "⚠️  Web container not found. Migration step skipped."
+  fi
+  
+  echo "✅ Deployment complete! Backend and frontend are up and running."
+  exit 0
+fi
+
+echo "Usage: $0 [up|down]"
+exit 1
+```

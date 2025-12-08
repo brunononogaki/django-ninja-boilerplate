@@ -6,7 +6,12 @@ Nesse capítulo, vamos implementar o CI/CD nesse projeto através de Workflows d
 * Rodar o Linter com o Ruff
 * Fazer deploy no servidor
 
-Nesse exemplo, vou subir a aplicação toda em uma VPS da Hostinger. Para não complicar muito por enquanto, esse deploy será feito em HTTP na porta 8000 mesmo, mas depois podemos colocar um Nginx ou um Traefik na frente, mas vamos aos poucos.
+!!! note
+
+  Nesse exemplo, vou subir a aplicação toda em uma VPS da Hostinger. Nesse ambiente, eu já tenho um container de Traefik configurado, que vou deixar documentando nesse [apêndice](../Appendix/01_Configurando_o_Traefik.md).
+  
+  O Traefik vai servir como um Reverse Proxy, encaminhando as solicitações HTTPS dos clients para esse container. E por fins de exemplos, implementaremos esse Backend na URL https://myapi.brunononogaki.com. 
+
 
 ## Criando Workflow de Testes
 
@@ -127,7 +132,7 @@ Além disso, vamos criar também um script `deploy.sh` pra ficar mais fácil de 
 
 Começando com o arquivo do docker-compose, vamos declarar dois containers:
 * Um container de Postgres, com a diferença que aqui em Prod temos que mapear o volume para os dados persistirem caso ele reinicie. E aqui não vamos expor nenhuma porta, porque o nosso servidor web vai conseguir falar internamente através da network do docker.
-* Um container do nosso Web Server Django, expondo a porta 8000, mas sendo buildado através de um Dockerfile, que vai levantar um servidor Uvicorn:
+* Um container do nosso Web Server Django, configurado para utilizar o Traefik como Reverse proxy, escutando na URL **myapi.brunononogaki.com**, porta 443 (HTTPS), e encaminhando para a porta 8000 do container.
 
 
 ```yaml title="infra/compose-pro.yaml"
@@ -142,6 +147,8 @@ services:
     restart: unless-stopped    
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - my-network            
     logging:
       driver: "json-file"
       options:
@@ -155,8 +162,15 @@ services:
       dockerfile: infra/Dockerfile-pro
     env_file:
       - ../.env.production
-    ports:
-      - "8000:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.myapi.rule=Host(`myapi.brunononogaki.com`)"
+      - "traefik.http.routers.myapi.entrypoints=websecure"
+      - "traefik.http.routers.myapi.tls=true"
+      - "traefik.http.services.myapi.loadbalancer.server.port=8000"
+      - "traefik.docker.network=my-network"
+    networks:
+      - my-network      
     depends_on:
       - database
     restart: unless-stopped
@@ -172,6 +186,10 @@ services:
 
 volumes:
   pgdata:
+
+networks:
+  my-network:
+    external: true
 ```
 
 E o `Dockerfile-pro` ficará assim:
@@ -332,7 +350,7 @@ jobs:
 Agora, quando você fizer um push para a branch main, os containers do WebServer e do Banco de Dados irão subir:
 ```bash
 CONTAINER ID   IMAGE                    COMMAND                  CREATED         STATUS                 PORTS                                                                                          NAMES
-113c6f842156   infra-web                "uvicorn myapi.asgi:…"   6 seconds ago   Up 6 seconds           0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp                                                    django-ninja-prod
+60055a3d99e3   infra-web                "uvicorn myapi.asgi:…"   50 minutes ago   Up 50 minutes         8000/tcp                                                                                       django-ninja-prod
 056561459f60   postgres:17.0            "docker-entrypoint.s…"   6 seconds ago   Up 6 seconds           5432/tcp                                                                                       postgres-prod
 ```
 
