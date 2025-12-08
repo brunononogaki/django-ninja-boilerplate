@@ -33,6 +33,7 @@ Now using node v20.19.6 (npm v10.8.2)
 ### Criando o projeto com o NPM
 
 Para criar o projeto, faremos:
+
 ```bash
 npm init
 # Defina um nome de projeto, author, description, ou deixe tudo default
@@ -43,6 +44,7 @@ npm install react-dom@19.2.1
 ```
 
 Isso vai criar um arquivo `package.json` assim:
+
 ```javascript
 {
   "name": "frontend",
@@ -63,6 +65,7 @@ Isso vai criar um arquivo `package.json` assim:
 ```
 
 Vamos adicionar o nosso primeiro script e apagar esse de "test" que ele criou automaticamente
+
 ```javascript
 "scripts": {
   "dev": "next dev",
@@ -73,9 +76,9 @@ Agora vamos criar um arquivo `index.js` em uma nova pasta chamada /pages/:
 
 ```javascript title="./next/pages/index.js"
 function Home() {
-    return <h1>Teste</h1>
+  return <h1>Teste</h1>;
 }
-export default Home
+export default Home;
 ```
 
 !!! success
@@ -99,9 +102,9 @@ Vamos criar um container no ambiente de dev para subir o front, e depois podemos
 
 Para o ambiente de `dev`, podemos subir o React com o `npm run dev`.
 
-Primeiro vamos criar um Dockerfile para *buildar* uma imagem de Node com o React:
+Primeiro vamos criar um Dockerfile para _buildar_ uma imagem de Node com o React:
 
-```Dockerfile title="./react/infra/Dockerfile-dev"
+```Dockerfile title="./next/infra/Dockerfile-dev"
 FROM node:20-alpine
 
 WORKDIR /app
@@ -119,7 +122,7 @@ CMD ["npm", "run", "dev"]
 
 E agora o arquivo de compose para subir esse serviço, expondo a porta 3000 (padrão do Next):
 
-```yaml title="./react/infra/compose-dev.yaml"
+```yaml title="./next/infra/compose-dev.yaml"
 version: "3.8"
 
 services:
@@ -144,7 +147,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
 ```
 
 E agora vamos editar o arquivo `pyproject.toml` para iniciar e baixar esses containers nos comandos de services-up, services-down e services-stop:
@@ -176,7 +178,7 @@ Para o ambiente de Produção, da mesma forma como fizemos o Backend, vamos colo
 
 Primeiramente, vamos criar o `Dockerfile-pro`:
 
-```Dockerfile title="./react/infra/Dockerfile-pro"
+```Dockerfile title="./next/infra/Dockerfile-pro"
 # Build stage
 FROM node:20-alpine AS builder
 
@@ -207,7 +209,7 @@ CMD ["npm", "start"]
 
 E agora o compose:
 
-```yaml title="./react/infra/compose-pro.yaml"
+```yaml title="./next/infra/compose-pro.yaml"
 version: "3.8"
 
 services:
@@ -261,7 +263,7 @@ set -e  # Exit on any error
 if [ "$1" = "down" ]; then
   echo "🛑 Stopping and removing production containers..."
   docker compose --file infra/compose-pro.yaml down
-  docker compose --file react/infra/compose-pro.yaml down
+  docker compose --file next/infra/compose-pro.yaml down
   exit 0
 fi
 
@@ -284,7 +286,7 @@ if [ "$1" = "up" ] || [ -z "$1" ]; then
 
   # Build and start frontend containers
   echo "📦 Building and starting frontend..."
-  docker compose --file react/infra/compose-pro.yaml up -d --build
+  docker compose --file next/infra/compose-pro.yaml up -d --build
 
   # Run migrations inside the web container
   WEB_CONTAINER=$(docker compose --file infra/compose-pro.yaml ps -q web)
