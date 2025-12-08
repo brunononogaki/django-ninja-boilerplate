@@ -206,19 +206,23 @@ services:
     restart: unless-stopped
     networks:
       - my-network
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL}
+    env_file:
+      - ../../.env.production
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.react.rule=Host(`react.brunononogaki.com`)"
-      - "traefik.http.routers.react.entrypoints=websecure"
-      - "traefik.http.routers.react.tls=true"
-      - "traefik.http.services.react.loadbalancer.server.port=3000"
+      - "traefik.http.routers.frontend.rule=Host(`react.brunononogaki.com`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
       - "traefik.docker.network=my-network"
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-        
+
 networks:
   my-network:
     external: true

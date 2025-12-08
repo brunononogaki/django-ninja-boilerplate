@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 
 services:
   database:
@@ -6,11 +6,11 @@ services:
     image: postgres:17.0
     env_file:
       - ../.env.production
-    restart: unless-stopped    
+    restart: unless-stopped
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
-      - my-network            
+      - my-network
     logging:
       driver: "json-file"
       options:
@@ -26,13 +26,13 @@ services:
       - ../.env.production
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.myapi.rule=Host(`myapi.brunononogaki.com`)"
+      - "traefik.http.routers.myapi.rule=Host(`${BACKEND_FQDN}`)"
       - "traefik.http.routers.myapi.entrypoints=websecure"
       - "traefik.http.routers.myapi.tls=true"
       - "traefik.http.services.myapi.loadbalancer.server.port=8000"
       - "traefik.docker.network=my-network"
     networks:
-      - my-network      
+      - my-network
     depends_on:
       - database
     restart: unless-stopped

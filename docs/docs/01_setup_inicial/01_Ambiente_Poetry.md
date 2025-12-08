@@ -71,18 +71,28 @@ django-admin startproject myapi .
 - Crie um arquivo `.env.development` no diretório raíz. Já vamos deixar criado umas coisas que usaremos mais pra frente.
 
 ```bash title=".env.development"
+# DATABASE
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 POSTGRES_USER=devuser
 POSTGRES_PASSWORD=devpassword
 POSTGRES_DB=postgres
 
+# GENERAL CONFIG
+BACKEND_FQDN=myapi.brunononogaki.com
+FRONTEND_FQDN=react.brunononogaki.com
+
+# FRONTEND CONFIG
+REACT_APP_API_URL=myapi.brunononogaki.com
+
+# BACKEND CONFIG
 SECRET_KEY='mysecretkey-dev'
 ALLOWED_HOSTS=localhost,127.0.0.1,.brunononogaki.com
 
+# DJANGO CONFIG
 DJANGO_ADMIN_USER = 'admin'
 DJANGO_ADMIN_EMAIL = 'admin@admin.com'
-DJANGO_ADMIN_PASWORD = 'devpassword'
+DJANGO_ADMIN_PASSWORD = 'devpassword'
 ```
 
 ## Instalando ferramentas de Dev
