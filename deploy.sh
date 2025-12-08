@@ -7,7 +7,7 @@ set -e  # Exit on any error
 if [ "$1" = "down" ]; then
   echo "🛑 Stopping and removing production containers..."
   docker compose --file infra/compose-pro.yaml down
-  docker compose --file react/infra/compose-pro.yaml down
+  docker compose --file next/infra/compose-pro.yaml down
   exit 0
 fi
 
@@ -30,7 +30,7 @@ if [ "$1" = "up" ] || [ -z "$1" ]; then
   
   # Build and start frontend containers
   echo "📦 Building and starting frontend..."
-  docker compose --file react/infra/compose-pro.yaml up -d --build
+  docker compose --file next/infra/compose-pro.yaml up -d --build
   
   # Run migrations inside the web container
   WEB_CONTAINER=$(docker compose --file infra/compose-pro.yaml ps -q web)
