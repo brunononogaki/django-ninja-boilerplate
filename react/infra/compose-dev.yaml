@@ -5,18 +5,20 @@ services:
     build:
       context: ../myfront
       dockerfile: ../infra/Dockerfile-dev
-    container_name: myfront
+    container_name: myfront-dev
     ports:
       - "5173:5173"
     volumes:
       - ../myfront/src:/app/src
       - ../myfront/public:/app/public
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_API_URL=${REACT_APP_API_URL}
     command: npm run dev -- --host
-    restart: unless-stopped    
+    restart: unless-stopped
+    env_file:
+      - ../../.env.development
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "3"    
+        max-file: "3"
