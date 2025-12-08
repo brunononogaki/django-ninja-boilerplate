@@ -179,32 +179,21 @@ Para o ambiente de Produção, da mesma forma como fizemos o Backend, vamos colo
 Primeiramente, vamos criar o `Dockerfile-pro`:
 
 ```Dockerfile title="./next/infra/Dockerfile-pro"
-# Build stage
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-RUN npm run build
-
-# Production stage
 FROM node:20-alpine
 
 WORKDIR /app
 
-RUN npm install --only=production
+COPY package*.json ./
 
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package*.json ./
+RUN npm install
+
+COPY . .
+
+RUN npm run build
 
 EXPOSE 3000
 
 CMD ["npm", "start"]
-
 ```
 
 E agora o compose:
@@ -223,8 +212,9 @@ services:
     restart: unless-stopped
     networks:
       - my-network
-    environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_APP_API_URL}
+    volumes:
+      - ../pages:/app/pages
+      - ../public:/app/public
     env_file:
       - ../../.env.production
     labels:
@@ -282,11 +272,11 @@ if [ "$1" = "up" ] || [ -z "$1" ]; then
 
   # Build and start backend containers
   echo "📦 Building and starting backend..."
-  docker compose --file infra/compose-pro.yaml up -d --build
+  docker compose --file infra/compose-pro.yaml --project-name django-ninja up -d --build
 
   # Build and start frontend containers
   echo "📦 Building and starting frontend..."
-  docker compose --file next/infra/compose-pro.yaml up -d --build
+  docker compose --file next/infra/compose-pro.yaml --project-name django-ninja up -d --build
 
   # Run migrations inside the web container
   WEB_CONTAINER=$(docker compose --file infra/compose-pro.yaml ps -q web)
