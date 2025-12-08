@@ -6,8 +6,8 @@ set -e  # Exit on any error
 
 if [ "$1" = "down" ]; then
   echo "🛑 Stopping and removing production containers..."
-  docker compose --file infra/compose-pro.yaml down
-  docker compose --file next/infra/compose-pro.yaml down
+  docker compose --file infra/compose-pro.yaml --project-name django-ninja down
+  docker compose --file next/infra/compose-pro.yaml --project-name django-ninja down
   exit 0
 fi
 
@@ -33,10 +33,10 @@ if [ "$1" = "up" ] || [ -z "$1" ]; then
   docker compose --file next/infra/compose-pro.yaml --project-name django-ninja up -d --build
   
   # Run migrations inside the web container
-  WEB_CONTAINER=$(docker compose --file infra/compose-pro.yaml ps -q web)
+  WEB_CONTAINER=$(docker compose --file infra/compose-pro.yaml --project-name django-ninja ps -q web)
   if [ -n "$WEB_CONTAINER" ]; then
     echo "🔄 Running migrations..."
-    docker compose --file infra/compose-pro.yaml exec web python manage.py migrate
+    docker compose --file infra/compose-pro.yaml --project-name django-ninja exec web python manage.py migrate
   else
     echo "⚠️  Web container not found. Migration step skipped."
   fi
