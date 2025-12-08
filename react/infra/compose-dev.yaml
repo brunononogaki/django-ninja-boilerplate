@@ -3,17 +3,17 @@ version: "3.8"
 services:
   frontend-dev:
     build:
-      context: ..
-      dockerfile: infra/Dockerfile-dev
+      context: ../myfront
+      dockerfile: ../infra/Dockerfile-dev
     container_name: myfront-dev
     ports:
-      - "3000:3000"
+      - "5173:5173"
     volumes:
-      - ../pages:/app/pages
-      - ../public:/app/public
+      - ../myfront/src:/app/src
+      - ../myfront/public:/app/public
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_APP_API_URL}
-    command: npm run dev
+      - REACT_APP_API_URL=http://localhost:8000
+    command: npm run dev -- --host
     restart: unless-stopped
     env_file:
       - ../../.env.development
