@@ -1,15 +1,16 @@
-# Iniciando um projeto React para o Front-end
+# Iniciando um projeto React com Next.js para o Front-end
 
-Precisaremos de um Front-End para consumir o nosso Backend Django Ninja. Para isso, optei por criar um projeto usando `React + Vite`. Para ficar mais fácil, deixarei o código do front nesse mesmo repositório, tudo dentro da pasta `react` na raíz do projeto.
+Precisaremos de um Front-End para consumir o nosso Backend Django Ninja. Para isso, optei por criar um projeto usando `React com Next.js`. Para ficar mais fácil, deixarei o código do front nesse mesmo repositório, tudo dentro da pasta `next` na raíz do projeto.
 
 ## Construindo o ambiente
 
 ### Criando a pasta do projeto do Front-End
 
-A primeira coisa é criar a pasta `react` na raíz do projeto, e entrar nela:
+A primeira coisa é criar a pasta `next` na raíz do projeto, e entrar nela:
+
 ```bash
-mkdir -p react
-cd react
+mkdir -p next
+cd next
 ```
 
 ### Definindo a versão do Node
@@ -22,67 +23,75 @@ lts/iron
 ```
 
 E agora para usar essa versão, basta dar o comando:
+
 ```bash
 nvm use
 
 Now using node v20.19.6 (npm v10.8.2)
 ```
 
-### Criando o projeto com o Vite
+### Criando o projeto com o NPM
 
-Utilizaremos o `Vite` para construir o nosso projeto, e durante o setup, escolheremos o framework `React` com `JavaScript`. Pode dar o nome que for mais conveniente, nesse exemplo vou chamar simplesmente de `myfront`:
-
+Para criar o projeto, faremos:
 ```bash
-npm create vite@latest myfront
+npm init
+# Defina um nome de projeto, author, description, ou deixe tudo default
 
-◆  Select a framework:
-│  ○ Vanilla
-│  ○ Vue
-│  ● React
-│  ○ Preact
-│  ○ Lit
-│  ○ Svelte
-│  ○ Solid
-│  ○ Qwik
-│  ○ Angular
-│  ○ Marko
-│  ○ Others
-
-◆  Select a variant:
-│  ○ TypeScript
-│  ○ TypeScript + React Compiler
-│  ○ TypeScript + SWC
-│  ● JavaScript
-│  ○ JavaScript + React Compiler
-│  ○ JavaScript + SWC
-│  ○ React Router v7 ↗
-│  ○ TanStack Router ↗
-│  ○ RedwoodSDK ↗
-│  ○ RSC ↗
-│  ○ Vike ↗
+npm install next@16.0.7
+npm install react@19.2.1
+npm install react-dom@19.2.1
 ```
 
-Esse Wizard já vai subir o nosso front no endereço http://localhost:5173, e vai criar a seguinte estrutura de pastas dentro da pasta `react`:
-
-```bash
-.
-└── myfront
-    ├── README.md
-    ├── eslint.config.js
-    ├── index.html
-    ├── package-lock.json
-    ├── package.json
-    ├── public
-    │   └── vite.svg
-    ├── src
-    │   ├── App.css
-    │   ├── App.jsx
-    │   ├── assets
-    │   │   └── react.svg
-    │   ├── index.css
-    │   └── main.jsx
-    └── vite.config.js
+Isso vai criar um arquivo `package.json` assim:
+```javascript
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev"
+  },
+  "author": "Bruno Nonogaki",
+  "license": "ISC",
+  "description": "Sample front-end to consume our Django API",
+  "dependencies": {
+    "next": "^16.0.7",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1"
+  }
+}
 ```
+
+Vamos adicionar o nosso primeiro script e apagar esse de "test" que ele criou automaticamente
+```javascript
+"scripts": {
+  "dev": "next dev",
+}
+```
+
+Agora vamos criar um arquivo `index.js` em uma nova pasta chamada /pages/:
+
+```javascript title="./next/pages/index.js"
+function Home() {
+    return <h1>Teste</h1>
+}
+export default Home
+```
+
+!!! success
+
+    Sucesso! Agora se você der o comando `npm run dev`, o front já estará disponivel na URL http://localhost:3000
+    ```bash
+    > frontend@1.0.0 dev
+    > next dev
+
+      ▲ Next.js 16.0.7 (Turbopack)
+      - Local:         http://localhost:3000
+      - Network:       http://192.168.0.3:3000
+
+    ✓ Starting...
+    ✓ Ready in 406ms
+    ```
 
 ## Criando Containers de Dev
 
@@ -90,7 +99,7 @@ Vamos criar um container no ambiente de dev para subir o front, e depois podemos
 
 Para o ambiente de `dev`, podemos subir o React com o `npm run dev`.
 
-Primeiro vamos criar um Dockerfile para buildar uma imagem de Node com o React:
+Primeiro vamos criar um Dockerfile para *buildar* uma imagem de Node com o React:
 
 ```Dockerfile title="./react/infra/Dockerfile-dev"
 FROM node:20-alpine
@@ -103,44 +112,48 @@ RUN npm install
 
 COPY . .
 
-EXPOSE 5173
+EXPOSE 3000
 
 CMD ["npm", "run", "dev"]
-````
+```
 
-E agora o arquivo de compose para subir esse serviço, expondo a porta 5173 (padrão do Vite):
+E agora o arquivo de compose para subir esse serviço, expondo a porta 3000 (padrão do Next):
+
 ```yaml title="./react/infra/compose-dev.yaml"
 version: "3.8"
 
 services:
   frontend-dev:
     build:
-      context: ../myfront
-      dockerfile: ../infra/Dockerfile-dev
-    container_name: myfront
+      context: ..
+      dockerfile: infra/Dockerfile-dev
+    container_name: myfront-dev
     ports:
-      - "5173:5173"
+      - "3000:3000"
     volumes:
-      - ../myfront/src:/app/src
-      - ../myfront/public:/app/public
+      - ../pages:/app/pages
+      - ../public:/app/public
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
-    command: npm run dev -- --host
-    restart: unless-stopped    
+      - NEXT_PUBLIC_API_URL=${NEXT_APP_API_URL}
+    command: npm run dev
+    restart: unless-stopped
+    env_file:
+      - ../../.env.development
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "3"    
+        max-file: "3"
+
 ```
 
 E agora vamos editar o arquivo `pyproject.toml` para iniciar e baixar esses containers nos comandos de services-up, services-down e services-stop:
 
 ```toml title="./pyproject.toml" hl_lines="2-4"
 [tool.taskipy.tasks]
-services-up = "docker compose -f infra/compose-dev.yaml up -d && docker compose -f react/infra/compose-dev.yaml up -d"
-services-stop = "docker compose -f infra/compose-dev.yaml stop && docker compose -f react/infra/compose-dev.yaml stop"
-services-down = "docker compose -f infra/compose-dev.yaml down && docker compose -f react/infra/compose-dev.yaml down"
+services-up = "docker compose -f infra/compose-dev.yaml up -d && docker compose -f next/infra/compose-dev.yaml up -d"
+services-stop = "docker compose -f infra/compose-dev.yaml stop && docker compose -f next/infra/compose-dev.yaml stop"
+services-down = "docker compose -f infra/compose-dev.yaml down && docker compose -f next/infra/compose-dev.yaml down"
 create-env-dev = "ln -sf .env.development .env"
 create-env-prod = "ln -sf .env.production .env"
 run = 'task create-env-dev && task services-up && python infra/wait-for-postgres.py && python manage.py migrate && python manage.py runserver'
@@ -161,7 +174,7 @@ commit = 'poetry run cz commit'
 
 Para o ambiente de Produção, da mesma forma como fizemos o Backend, vamos colocar o [Traefik](../Appendix/01_Configurando_o_Traefik.md) como Reverse Proxy.
 
-Primeiramente, vamos criar o `Dockerfile`:
+Primeiramente, vamos criar o `Dockerfile-pro`:
 
 ```Dockerfile title="./react/infra/Dockerfile-pro"
 # Build stage
@@ -180,13 +193,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-RUN npm install -g serve
+RUN npm install --only=production
 
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package*.json ./
 
 EXPOSE 3000
 
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["npm", "start"]
 
 ```
 
@@ -198,8 +213,8 @@ version: "3.8"
 services:
   frontend:
     build:
-      context: ../myfront
-      dockerfile: ../infra/Dockerfile-pro
+      context: ..
+      dockerfile: infra/Dockerfile-pro
     container_name: frontend-prod
     expose:
       - "3000"
@@ -207,7 +222,7 @@ services:
     networks:
       - my-network
     environment:
-      - REACT_APP_API_URL=${REACT_APP_API_URL}
+      - NEXT_PUBLIC_API_URL=${NEXT_APP_API_URL}
     env_file:
       - ../../.env.production
     labels:
@@ -253,24 +268,24 @@ fi
 if [ "$1" = "up" ] || [ -z "$1" ]; then
   # Default: up (build, up, migrate)
   echo "🚀 Starting production deployment..."
-  
+
   # Check if .env.production exists
   if [ ! -f .env.production ]; then
       echo "❌ Error: .env.production file not found!"
       exit 1
   fi
-  
+
   # Symlink .env.production to .env
   ln -sf .env.production .env
-  
+
   # Build and start backend containers
   echo "📦 Building and starting backend..."
   docker compose --file infra/compose-pro.yaml up -d --build
-  
+
   # Build and start frontend containers
   echo "📦 Building and starting frontend..."
   docker compose --file react/infra/compose-pro.yaml up -d --build
-  
+
   # Run migrations inside the web container
   WEB_CONTAINER=$(docker compose --file infra/compose-pro.yaml ps -q web)
   if [ -n "$WEB_CONTAINER" ]; then
@@ -279,7 +294,7 @@ if [ "$1" = "up" ] || [ -z "$1" ]; then
   else
     echo "⚠️  Web container not found. Migration step skipped."
   fi
-  
+
   echo "✅ Deployment complete! Backend and frontend are up and running."
   exit 0
 fi
