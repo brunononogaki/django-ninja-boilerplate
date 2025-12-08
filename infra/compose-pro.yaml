@@ -9,6 +9,8 @@ services:
     restart: unless-stopped    
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - my-network            
     logging:
       driver: "json-file"
       options:
@@ -22,8 +24,15 @@ services:
       dockerfile: infra/Dockerfile-pro
     env_file:
       - ../.env.production
-    ports:
-      - "8000:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.myapi.rule=Host(`myapi.brunononogaki.com`)"
+      - "traefik.http.routers.myapi.entrypoints=websecure"
+      - "traefik.http.routers.myapi.tls=true"
+      - "traefik.http.services.myapi.loadbalancer.server.port=8000"
+      - "traefik.docker.network=my-network"
+    networks:
+      - my-network      
     depends_on:
       - database
     restart: unless-stopped
@@ -39,3 +48,7 @@ services:
 
 volumes:
   pgdata:
+
+networks:
+  my-network:
+    external: true
