@@ -11,7 +11,7 @@ nav:
     - 05. Implementando CI/CD: 01_setup_inicial/05_Implementando_CI_CD.md
     - 06. Implementando Linting de commits: 01_setup_inicial/06_Commit_linting.md
   - Setup do Front-End (React):
-    - 01. Iniciando um projeto React: 02_setup_front/01_Iniciando_React.md
+    - 01. Iniciando um projeto React com Next.js: 02_setup_front/01_Iniciando_React.md
   - Apêndice:
     - 01. Configurando o Traefik: Appendix/01_Configurando_o_Traefik.md    
 theme:

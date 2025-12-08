@@ -67,7 +67,6 @@ django-admin startproject myapi .
 
     Se o comando poetry shell não funcionar, rode esses comandos como poetry run django-admin startproject myapi .
 
-
 - Crie um arquivo `.env.development` no diretório raíz. Já vamos deixar criado umas coisas que usaremos mais pra frente.
 
 ```bash title=".env.development"
@@ -83,7 +82,7 @@ BACKEND_FQDN=myapi.brunononogaki.com
 FRONTEND_FQDN=react.brunononogaki.com
 
 # FRONTEND CONFIG
-REACT_APP_API_URL=myapi.brunononogaki.com
+NEXT_APP_API_URL=myapi.brunononogaki.com
 
 # BACKEND CONFIG
 SECRET_KEY='mysecretkey-dev'
@@ -387,4 +386,3 @@ format = 'ruff format'
 !!! success
 
     Boa! Agora a seguir a gente vai configurar o Django e criar nossa primeira aplicação! 😎
-
