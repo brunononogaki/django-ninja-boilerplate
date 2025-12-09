@@ -9,7 +9,7 @@ Esse guia será usado para documentar a criação de uma API com Django Ninja do
 
 Repositório do Projeto: [GitHub - django-ninja-boilerplate](https://github.com/brunononogaki/django-ninja-boilerplate)
 
-## Criando um ambiente de desenvolvimento com Poetry
+## Criando um ambiente local de desenvolvimento com Poetry
 
 - Primeiramente, vamos criar um projeto novo com o Poetry:
 
@@ -27,27 +27,28 @@ poetry add django-extensions
 poetry add python-decouple
 poetry add psycopg
 poetry add uvicorn
+poetry add pyjwt
 ```
 
 - Agora temos que editar o arquivo `pyproject.toml`:
 
 Substitua esse bloco:
 
-```toml
+```toml title="./pyproject.toml"
 [tool.poetry]
 packages = [{include = "django_ninja_boilerplate", from = "src"}]
 ```
 
 Por esse:
 
-```toml
+```toml title="./pyproject.toml"
 [tool.poetry]
 package-mode = false
 ```
 
 E altere o requires-python adicionando um `,<4.0` (é necessário para instar o Taskipy mais pra frente):
 
-```
+```toml title="./pyproject.toml"
 requires-python = ">=3.13,<4.0"
 ```
 
@@ -69,7 +70,7 @@ django-admin startproject myapi .
 
 - Crie um arquivo `.env.development` no diretório raíz. Já vamos deixar criado umas coisas que usaremos mais pra frente.
 
-```bash title=".env.development"
+```bash title="./.env.development"
 # DATABASE
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
@@ -106,16 +107,16 @@ poetry add --dev pytest-cov
 poetry add --dev pytest-watch
 poetry add --dev ruff               # Linter
 poetry add --dev taskipy            # Atalho para comandos
-poetry add --dev honcho             # Rodar rotinas em paralelo, como o concurrently do NPM
+poetry add --dev honcho             # Rodar rotinas em paralelo
 ```
 
 - Configurando o Taskipy:
 
-Utilizaremos o `Taskipy` para criar atalhos de comandos, igual a gente faz `npm run`, `npm test` no Node, mas vai ser `task run`, `task test` no Python.
+Utilizaremos o `Taskipy` para criar atalhos de comandos. Assim, poderemos subir o ambiente com o comando `task run`, rodar os testes com o `task test`, etc. É como o `Makefile`, mas funciona em qualquer Sistema Operacional.
 
 Vamos adicionar as seguintes configurações `pyproject.toml` para o `Taskipy`. Já vamos colocar alguns comandos que a gente só vai usar mais pra frente, mas já fica no jeito para funcionar quando tivermos tudo pronto:
 
-```toml title="pyproject.toml"
+```toml title="./pyproject.toml"
 [tool.taskipy.tasks]
 services-up = "docker compose -f infra/compose-dev.yaml up -d"
 services-stop = "docker compose -f infra/compose-dev.yaml stop"
@@ -135,7 +136,7 @@ migrate = 'python manage.py makemigrations && python manage.py migrate'
 
 Vamos adicionar as seguintes configurações no `pyproject.toml` para o `Ruff` (pode alterar como preferir):
 
-```toml title="pyproject.toml"
+```toml title="./pyproject.toml"
 [tool.ruff]
 line-length = 119
 extend-exclude = ['migrations', 'manage.py']
@@ -155,7 +156,7 @@ Como já temos os comandos do Taskipy configurados, podemos usar o `task format`
 
 Vamos adicionar as seguintes configurações `pyproject.toml` para o `Pytest` (pode alterar como preferir):
 
-```toml title="pyproject.toml"
+```toml title="./pyproject.toml"
 [tool.pytest.ini_options]
 pythonpath = "."
 addopts = '-p no:warnings'
@@ -163,7 +164,7 @@ addopts = '-p no:warnings'
 
 E criar um novo arquivo na raíz chamado `pytest.ini`:
 
-```toml title="pytest.ini"
+```toml title="./pytest.ini"
 [pytest]
 DJANGO_SETTINGS_MODULE = myapi.settings
 python_files = tests.py test_*.py *_tests.py
@@ -176,7 +177,7 @@ Como já temos os comandos do Taskipy configurados, podemos usar o `task test` o
 
 Para esse desenvolvimento, ao invés de usar o SQLite padrão do Django, vamos subir um banco Postgres local com Docker. E aí quando subirmos na produção, apenas mudamos os valores no .env para apontar para o Banco de Prod. Então vamos criar uma pasta chamada `infra`, e nela criar os arquivos de compose do `docker-compose`.
 
-```yaml title="compose-dev.yaml"
+```yaml title="./infra/compose-dev.yaml"
 services:
   database:
     container_name: postgres-dev
@@ -239,7 +240,7 @@ For more information on production servers see: https://docs.djangoproject.com/e
 
 Podemos colocar tudo isso dentro do comando `task run` para ficar mais fácil, e já aproveitar e nele rodar o `task services-up` para subir o banco. Mas seria legal subir a Web somente depois de o banco estar disponível. Para isso, vamos criar um script chamado `wait-for-postgres.py` e colocá-lo na pasta `infra`:
 
-```python title="wait-for-postgres.py"
+```python title="./infra/wait-for-postgres.py"
 import subprocess
 import sys
 import time
@@ -268,7 +269,7 @@ if __name__ == '__main__':
 
 E agora, voltando ao que já temos configurado no Taskipy:
 
-```toml
+```toml title="./pyproject.toml"
 [tool.taskipy.tasks]
 services-up = "docker compose -f infra/compose-dev.yaml up -d"
 services-stop = "docker compose -f infra/compose-dev.yaml stop"
@@ -302,14 +303,14 @@ Só que tem uma complexidade aí. O banco com o Docker roda em modo `detached` c
 
 Já instalamos o Honchu como dependência de dev mais pra cima, então só falta configurá-lo. Para isso, vamos criar na raiz do projeto um arquivo chamado `Procfile`. E nesse arquivo, vamos definir dois processos: um chamado web, que vai subir o Django e esconder os logs dele no terminal; e um chamado test, que vai rodar o Pytest:
 
-```title="Procfile"
+```title="./Procfile"
 web: python manage.py runserver 0.0.0.0:8000 > /dev/null 2>&1
 test: pytest -vv
 ```
 
 Agora vamos entender o comando que colocamos no Taskipy
 
-```toml
+```toml title="./pyproject.toml"
 test = 'task create-env-dev && task services-up && python infra/wait-for-postgres.py && honcho start web test && task down'
 ```
 
@@ -319,7 +320,7 @@ Esse comando vai criar o link simbólico do .env, subir o banco Postgres, espera
 
 Então até agora, o nosso `pyproject.toml` tá assim:
 
-```toml title="pyproject.toml"
+```toml title="./pyproject.toml"
 [project]
 name = "django-ninja-boilerplate"
 version = "0.1.0"
@@ -334,7 +335,8 @@ dependencies = [
     "django-extensions (>=4.1,<5.0)",
     "python-decouple (>=3.8,<4.0)",
     "psycopg (>=3.2.13,<4.0.0)",
-    "uvicorn (>=0.38.0,<0.39.0)"
+    "uvicorn (>=0.38.0,<0.39.0)",
+    "pyjwt (>=2.10.1,<3.0.0)"
 ]
 
 [tool.poetry]

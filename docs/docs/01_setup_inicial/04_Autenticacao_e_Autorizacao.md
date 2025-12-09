@@ -8,9 +8,9 @@ Vamos implantar a autenticação por meio de tokens JWT. Para isso, vamos instal
 poetry add PyJWT
 ```
 
-Agora vamos criar um arquivo em `myapi/core/auth.py`, para colocar as funções de criação do token e de autenticação, ambas usando a lib `jwt`
+Agora vamos criar um arquivo em `./myapi/core/auth.py`, para colocar as funções de criação do token e de autenticação, ambas usando a lib `jwt`
 
-```python title="myapi/core/auth.py"
+```python title="./myapi/core/auth.py"
 # myapi/core/auth.py
 import jwt
 from datetime import datetime, timedelta
@@ -55,7 +55,7 @@ class JWTAuth(HttpBearer):
 
 Agora precisamos criar a rota de geração de Token. Mas antes, vamos criar dois schemas para o retorno da rota de gerar token:
 
-```python title="myapi/core/schemas.py"
+```python title="./myapi/core/schemas.py"
 class TokenResponse(Schema):
     access_token: str
     refresh_token: str | None = None
@@ -68,7 +68,7 @@ class ErrorSchema(Schema):
 
 Agora sim vamos criar a rota de `login`:
 
-```python title="myapi/core/api.py" hl_lines="10-11"
+```python title="./myapi/core/api.py" hl_lines="10-11"
 from django.contrib.auth import get_user_model, authenticate
 from .auth import create_token, JWTAuth
 
@@ -93,7 +93,7 @@ def login(request, username: str = Form(...), password: str = Form(...)):
 
 E agora para proteger uma rota é só colocar um `auth=JWTAuth()`:
 
-```python title="myapi/core/api.py" hl_lines="6"
+```python title="./myapi/core/api.py" hl_lines="6"
 @router.get(
     'users',
     response=list[UserWithGroupsSchema],
@@ -110,7 +110,7 @@ def list_users(request):
 
 Agora vamos criar os testes para o endpoint de login:
 
-```python title="myapi/core/tests/test_auth.py"
+```python title="./myapi/core/tests/test_auth.py"
 import json
 from http import HTTPStatus
 
@@ -155,7 +155,7 @@ def test_login_missing_fields(client):
 
 Certo, mas esse teste é basicamente para ver se estamos conseguindo gerar o Token. Mas veja que ao proteger as rotas de CRUD de Users, quebramos os testes, porque agora precisamos passar uma autenticação. Vamos corrigir isso criando uma fixture de geração de Token antes de rodar os testes que já tinhamos criado.
 
-```python title="myapi/core/tests/test_users.py"
+```python title="./myapi/core/tests/test_users.py"
 @pytest.fixture
 def create_admin_access_token(client):
     response = client.post(
@@ -169,7 +169,7 @@ def create_admin_access_token(client):
 
 E agora basta chamar essa fixture nos testes que precisam de autenticação, e enviar o header com o Token. Mas veja que o TestClient do Django não aceita passarmos um header={} como no requests, precisamos especificar os cabeçalhos como argumentos nomeados com o prefixo `HTTP_`, por exemplo `HTTP_AUTHORIZATION`:
 
-```python title="myapi/core/tests/test_users.py"
+```python title="./myapi/core/tests/test_users.py"
 @pytest.mark.django_db
 def test_list_users(client, create_admin_access_token):
     response = client.get('/api/v1/users', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
@@ -182,7 +182,7 @@ def test_list_users(client, create_admin_access_token):
 
 E agora os testes todos de Users corrigidos para fazer a autenticação antes de rodar os requests:
 
-```python title="myapi/core/tests/test_users.py"
+```python title="./myapi/core/tests/test_users.py"
 import json
 from http import HTTPStatus
 from decouple import config
@@ -349,7 +349,7 @@ Faremos o seguinte: o usuário admin pode fazer tudo isso, mas o usuário não a
 
 Vamos começar com as rotas que são permitidas apenas pelos admins. Uma forma fácil seria verificar dentro da própria rota com a propriedade `is_staff`, assim:
 
-```python title="myapi/core/api.py"
+```python title="./myapi/core/api.py"
 @router.get('users', response=list[UserWithGroupsSchema], auth=JWTAuth())
 @paginate
 def list_users(request):
@@ -361,7 +361,7 @@ def list_users(request):
 
 Mas se formos usar isso em muitas rotas, compensa criar uma classe que valida se o usuário é Admin, e colocamos ela no decorator de cada rota. Vamos implementar dessa forma. No arquivo `auth.py`, vamos adicionar a classe AdminAuth, herdando do `JWTAuth` que já tinhamos criado antes:
 
-```python title="main/core/auth.py"
+```python title="./myapi/core/auth.py"
 # Classe já existente
 class JWTAuth(HttpBearer):
     def authenticate(self, request, token):
@@ -389,7 +389,7 @@ class AdminAuth(JWTAuth):
 
 E agora no `api.py` vamos importar essa classe e chamá-la no decorator das rotas que precisam de permissão de Admin:
 
-```python title="myapi/core/api.py"
+```python title="./myapi/core/api.py"
 from .auth import create_token, JWTAuth, AdminAuth
 
 @router.get(
@@ -408,7 +408,7 @@ Agora quando um usuário normal (não admin) tentar chamar essa rota, ele vai to
 
 Para testar, criaremos uma nova Fixture que autentica um usuário não admin, e usamos esse access token nas rotas que precisam de admin, para confirmar se a API retorna 401:
 
-```python title="myapi/core/tests/test_users.py"
+```python title="./myapi/core/tests/test_users.py"
 @pytest.fixture
 def create_non_admin_access_token(client, create_admin_access_token):
     # Create new non-admin user
@@ -461,7 +461,7 @@ def test_create_users_unauthorized(client, create_non_admin_access_token):
 
 Ótimo, agora para as rotas de UPDATE, DELETE e GET USER DETAIL, vamos validar se o usuário logado é admin ou se é ele mesmo. Para todas essas rotas a gente passa o id no request, então precisamos comparar se o id é o mesmo do id do usuário logado. Também tem várias formas de implementar isso, mas para manter consistência, vamos fazer da mesma forma, criando uma classe OwnerOrAdminAuth, herdando de JWTAuth, e chamando no decorator das rotas.
 
-```python title="myapi/core/auth.py"
+```python title="./myapi/core/auth.py"
 class OwnerOrAdminAuth(JWTAuth):
     def authenticate(self, request, token):
         user = super().authenticate(request, token)
@@ -488,7 +488,7 @@ class OwnerOrAdminAuth(JWTAuth):
 
 Agora na API é só importar a classe e chamar nos decorators:
 
-```python title="myapi/core/api.py"
+```python title="./myapi/core/api.py"
 from .auth import create_token, JWTAuth, AdminAuth, OwnerOrAdminAuth
 
 @router.get(
@@ -504,7 +504,7 @@ def get_user_detail(request, id: uuid.UUID):
 
 Vamos aplicar a mesma coisa nas rotas de PATCH e DELETE, e fazer os testes.
 
-```python title="myapi/core/tests/test_users.py"
+```python title="./myapi/core/tests/test_users.py"
 
 # Teste do admin fazendo o GET nele mesmo
 @pytest.mark.django_db
@@ -644,7 +644,7 @@ def test_patch_user_to_other_user_fail(client, create_non_admin_access_token):
 
 Com isso a gente termina a Autenticação e Autorização do CRUD de Users, abaixo o resumo de como está o código
 
-```python title="myapi/core/auth.py"
+```python title="./myapi/core/auth.py"
 # myapi/core/auth.py
 import jwt
 from datetime import datetime, timedelta
@@ -721,7 +721,7 @@ class OwnerOrAdminAuth(JWTAuth):
         return None
 ```
 
-```python title="myapi/core/api.py"
+```python title="./myapi/core/api.py"
 import uuid
 from http import HTTPStatus
 from django.db import connection
@@ -861,7 +861,7 @@ def login(request, username: str = Form(...), password: str = Form(...)):
     return 200, {'access_token': tokens.get('access_token') or tokens.get('access'), 'token_type': 'bearer', **tokens}
 ```
 
-```python title="myapi/core/schemas.py"
+```python title="./myapi/core/schemas.py"
 from django.contrib.auth import get_user_model
 from ninja import Field, ModelSchema, Schema
 from ninja.orm import create_schema
@@ -916,7 +916,7 @@ class ErrorSchema(Schema):
     detail: str
 ```
 
-```python title="myapi/core/tests/test_users.py"
+```python title="./myapi/core/tests/test_users.py"
 import json
 from http import HTTPStatus
 from decouple import config

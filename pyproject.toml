@@ -61,7 +61,7 @@ down = "pkill -f 'manage.py runserver'; task services-down"
 test = 'task create-env-dev && task services-up && python infra/wait-for-postgres.py && honcho start web test'
 test-watch = 'pytest-watch'
 lint = 'ruff check'
-format = 'ruff format '
+format = 'ruff format'
 migrate = 'python manage.py makemigrations && python manage.py migrate'
 commit = 'poetry run cz commit'
 

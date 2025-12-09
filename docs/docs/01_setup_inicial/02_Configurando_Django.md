@@ -1,8 +1,9 @@
 # Configurando o Django
 
-Agora que já temos a nossa infra toda configurada, vamos começar a subir o Django e criar a nossa primeira API
+Agora que já temos a nossa infra toda configurada, vamos começar a subir o Django e criar a nossa primeira rota de API!
 
 ## Criando a app `core`:
+
 Para começar a nossa API, vamos criar uma app nova chamada `core`, que vai ter coisas relacionadas ao sistema, como API de check de status e de gerência de usuários. Posteriormente criaremos outras apps para a nossa API.
 
 Para a estrutura de pastas das apps ficarem dentro da pasta do projeto "myapi˜, vamos primeiro dar um cd no "myapi" e criar o app a partir de lá. Desse jeito, acho que fica mais organizado:
@@ -15,6 +16,7 @@ python ../manage.py startapp core
 Na raíz do projeto vai ter as pastas `src` e `tests`, que o Django cria por padrão. Podemos apagá-las para não ficar lixo.
 
 A estrutura de pastas do projeto ficará assim:
+
 ```bash
 .
 ├── db.sqlite3
@@ -44,23 +46,25 @@ A estrutura de pastas do projeto ficará assim:
 ├── README.md
 ```
 
-## Editando o `myapi/core/apps.py` e `myapi/settings.py`
+## Editando o `./myapi/core/apps.py` e `./myapi/settings.py`
 
-Vamos editar o arquivo `myapi/core/apps.py` para o seguinte:
-```python title="myapi/core/apps.py"
+Vamos editar o arquivo `./myapi/core/apps.py` para o seguinte:
+
+```python title="./myapi/core/apps.py"
 class CoreConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     # name = 'core'        # ==> Remover
     name = 'myapi.core'    # <== Adicionar
 ```
 
-E agora no `myapi/settings.py`, vamos incluir o seguinte:
+E agora no `./myapi/settings.py`, vamos incluir o seguinte:
+
 - Tirar a SECRET_KEY do `settings.py` e importar o `.env` através da lib `decouple`
 - Adicionar ALLOWED_HOSTS já com o domínio que futuramente colocaremos pra nossa Prod
 - Adicionar a nossa app `core` em `INSTALLED_APPS`, junto com a extensão `django_extensions`, que poderemos usar mais pra frente
 - Configurar o Banco de Dados Postgres ao invés do SQLIte
 
-```python title="settings.py" hl_lines="12-13"
+```python title="./myapi/settings.py" hl_lines="12-13"
 from decouple import Csv, config
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
@@ -95,11 +99,11 @@ DATABASES = {
 }
 ```
 
-## Criando `myapi/api.py`:
+## Criando `./myapi/api.py`:
 
-Vamos criar um arquivo novo chamado `myapi/api.py`. Esse será o arquivo principal da nossa API, que vai agrupar as rotas dos demais apps, como as do `core`:
+Vamos criar um arquivo novo chamado `./myapi/api.py`. Esse será o arquivo principal da nossa API, que vai agrupar as rotas dos demais apps, como as do `core`:
 
-```python title="myapi/api.py"
+```python title="./myapi/api.py"
 from ninja import NinjaAPI
 
 api = NinjaAPI()
@@ -107,11 +111,11 @@ api = NinjaAPI()
 api.add_router('', 'myapi.core.api.router')
 ```
 
-## Editando `myapi/urls.py`:
+## Editando `./myapi/urls.py`:
 
-Agora vamos editar o `myapi/urls.py`, adicionando a rota principal da nossa API, que vou chamar de `api/v1/`:
+Agora vamos editar o `./myapi/urls.py`, adicionando a rota principal da nossa API, que vou chamar de `api/v1/`:
 
-```python title="myapi/urls.py"
+```python title="./myapi/urls.py"
 from django.contrib import admin
 from django.urls import path
 
@@ -134,7 +138,7 @@ Agora sim vamos criar a nossa primeira API de status. A ideia é que a rota `api
 
 Na pasta `core`, vamos criar um arquivo chamado `api.py`, onde incluiremos as nossas rotas:
 
-```python title="myapi/core/api.py"
+```python title="./myapi/core/api.py"
 from django.db import connection
 from http import HTTPStatus
 from ninja import Router
@@ -175,7 +179,7 @@ def status(request):
 
 E vamos também definir o Schema que é usado no retorno dessa API
 
-```python title="myapi/core/schemas.py"
+```python title="./myapi/core/schemas.py"
 from ninja import Schema
 
 class StatusSchema(Schema):
@@ -190,6 +194,7 @@ class StatusSchema(Schema):
 Certo, agora para iniciar o servidor, basta dar o comando `task run`
 
 Note que ele vai subir o Banco de Dados, aguardar ele ficar disponível, rodar a migração e subir o Web server:
+
 ```bash
 [+] Running 1/1
  ✔ Container postgres-dev  Running                                                                                                                                                                                        0.0s
@@ -235,11 +240,12 @@ For more information on production servers see: https://docs.djangoproject.com/e
 E para testar, você pode entrar na Doc Swagger que ele cria automaticamente: http://localhost:8000/api/v1/docs
 
 ## Criando testes
-Mas vamos criar os testes automatizados para ver se a nossa API responde.
+
+Mas vamos criar os testes automatizados para garantir que a nossa API responde conforme o esperado.
 
 Vamos criar uma pasta `tests` do dentro do nosso app `core`, e criar um arquivo chamado `test_status.py`. O arquivo padrão `tests.py` a gente pode remover.
 
-```python title="myapi/core/tests/test_status.py"
+```python title="./myapi/core/tests/test_status.py"
 from http import HTTPStatus
 
 import pytest
@@ -299,27 +305,24 @@ Agora uma forma legal de programar no VSCode é dividir o terminal em dois. Em u
 
 ![alt text](static/tests_vscode.png)
 
-
 ## Criando usuário admin padrão
+
 Para criar um "super user" no Django, o comando é `python manage.py createsuperuser`. Mas seria legal se a gente pudesse já por padrão criar esse usuário na inicialização do serviço. Mais especificamente, vamos criar o superuser automaticamente depois de rodar a migration.
 
-Para isso, vamos adicionar um script no `myapi/core/apps.py`:
+Para isso, vamos adicionar um script no `./myapi/core/apps.py`:
 
-```python title="myapi/core/apps.py"
+```python title="./myapi/core/apps.py"
+from decouple import config
 from django.apps import AppConfig
-
+from django.contrib.auth import get_user_model
+from django.db.models.signals import post_migrate
 
 class CoreConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'myapi.core'
- 
+
     def ready(self):
         # Create/update default superuser after migrations run.
-        # Keep imports local to avoid side-effects during Django startup.
-        from django.db.models.signals import post_migrate
-        from django.contrib.auth import get_user_model
-        from decouple import config
-
         def create_default_superuser(sender, **kwargs):
             User = get_user_model()
             username = config('DJANGO_ADMIN_USER', default='admin')
