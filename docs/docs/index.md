@@ -1,17 +1,18 @@
 # Django Ninja Boilerplate
 
 Bem-vindo ao **Django Ninja Boilerplate**!
-Estou constuindo essa API do absoluto ZERO, desde a criação do ambiente até termos uma API funcional de um projeto real. E a ideia é eu documentar cada etapa desse processo, e me auxiliar no estudo e progresso nesse Framework. Ainda está em construção, então faltam muitas coisas... mas vamos fazendo pouco a pouco.
+Estou construindo esse projeto do absoluto **ZERO**, desde a criação do ambiente, até termos uma API funcional desenvolvida com Django Ninja e um Frontend em Next.js consumindo a API. E a ideia é eu documentar cada etapa desse processo, e me auxiliar no estudo e progresso nesse Framework. Ainda está em construção, então faltam muitas coisas... mas vamos evoluindo pouco a pouco.
 
-## Recursos principais
+## Recursos disponíveis até o momento:
 
-- Django 5.x + Django Ninja (API moderna e tipada)
-- Autenticação JWT nativa (login, refresh, proteção de rotas)
-- Usuário customizado com UUID
+- Django 5.x + Django Ninja (Backend)
+- Next.js 16.x (Frontend)
+- Autenticação JWT 
+- Model de Users customizado com UUID
 - CRUD de Usuários
-- Testes automatizados com pytest
+- Testes automatizados do Backend com Pytest
 - Deploy Automatizado com GitHub Actions em um servidor VPS da Hostinger.
-- Documentação automática via Swagger/OpenAPI
+- Documentação da API com Swagger/OpenAPI
 
 ## Como começar
 
@@ -22,7 +23,7 @@ Estou constuindo essa API do absoluto ZERO, desde a criação do ambiente até t
 	```
 
 2. **Configuração local**
-	- Copie `.env.example` para `.env.development` e ajuste as variáveis.
+	- Ajuste o arquivo `.env.development` com as configurações do seu ambiente
 	- Instale as dependências:
 	  ```sh
 	  poetry install
@@ -30,8 +31,6 @@ Estou constuindo essa API do absoluto ZERO, desde a criação do ambiente até t
 
 3. **Rodando localmente**
 	```sh
-	poetry run python manage.py migrate
-	poetry run python manage.py createsuperuser
 	poetry run task run
 	```
 
@@ -40,8 +39,7 @@ Estou constuindo essa API do absoluto ZERO, desde a criação do ambiente até t
 
 ## Deploy
 
-- Pronto para deploy via Docker e GitHub Actions.
-- Veja o arquivo `README.md` e a documentação para detalhes.
+- Deploy em produção é feito via GitHub Actions em uma VPS da Hostinger
 
 ## Testes
 

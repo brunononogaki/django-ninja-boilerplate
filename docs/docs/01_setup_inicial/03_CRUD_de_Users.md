@@ -4,9 +4,9 @@ Para praticarmos um pouco de CRUD básico no Django Ninja, vamos desenvolver o C
 
 ## Recriando o Model Users
 
-Poderíamos criar um app específico para Users, mas nesse caso vamos criar dentro do app `core`, que já criamos nos documentos anteriores. Vamos editar o arquivo `myapi/core/models.py` e criar o nosso modelo novo de Users, herdando de AbstractUser:
+Poderíamos criar um app específico para Users, mas nesse caso vamos criar dentro do app `core`, que já criamos nos documentos anteriores. Vamos editar o arquivo `./myapi/core/models.py` e criar o nosso modelo novo de Users, herdando de AbstractUser:
 
-```python title="myapi/core/models.py"
+```python title="./myapi/core/models.py"
 import uuid
 
 from django.contrib.auth.models import AbstractUser
@@ -22,14 +22,14 @@ class UUIDUser(AbstractUser):
 
 Agora precisamos definir no `settings.py` que esse é o nosso novo model de Users:
 
-```python title="myapi/settings.py"
+```python title="./myapi/settings.py"
 # Custom User Model
 AUTH_USER_MODEL = 'core.UUIDUser'
 ```
 
 E como redefinimos o model, se quisermos que ele apareça no Admin do Django, vamos precisar registrá-lo no arquivo `admin.py` do app core:
 
-```python title="myapi/core/admin.py"
+```python title="./myapi/core/admin.py"
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
@@ -58,6 +58,7 @@ class MyUserAdmin(UserAdmin):
 ```
 
 Boa, agora é só rodar a migration com o atalho que criamos no `Taskipy`:
+
 ```bash
 task migrate
 ```
@@ -69,9 +70,10 @@ Agora se entrarmos no admin do Django, veremos que o ID do usuário admin (que f
 ## Criando o CRUD de Users
 
 ### Get
+
 Vamos começar com um GET simples na lista de usuários. Mas antes disso, vamos criar um Schema de Users. Como o Django já implementa por padrão o Model de Users, a gente pode usar um objeto chamado `ModelSchema` para criar automaticamente o Schema a partir do Model. Vamos usar bastante isso mais pra frente. Então para criar um Schema para Users, poderíamos fazer simplesmente isso:
 
-```python title="myapi/core/schemas.py"
+```python title="./myapi/core/schemas.py"
 # core/schemas.py
 from ninja import ModelSchema, Schema
 
@@ -86,7 +88,8 @@ class UserSchema(ModelSchema):
 ```
 
 Mas atenção, que isso exporia todos os campos do Model User, inclusive a senha, então poderíamos fazer assim para excluir alguns campos:
-```python title="myapi/core/schemas.py"
+
+```python title="./myapi/core/schemas.py"
 # core/schemas.py
 from ninja import ModelSchema, Schema
 
@@ -102,8 +105,7 @@ class UserSchema(ModelSchema):
 
 Mas como a gente redefiniu o nosso Model de Users para usar UUID, não podemos usar o User do django.contrib.auth.models. Ao invés disso, usaremos o `get_user_model()`, faremos assim:
 
-
-```python title="myapi/core/schemas.py"
+```python title="./myapi/core/schemas.py"
 from django.contrib.auth import get_user_model
 from ninja import Field, ModelSchema, Schema
 
@@ -117,7 +119,8 @@ class UserSchema(ModelSchema):
 ```
 
 Uma outra forma de criar nosso Schema é com o método create_schema, e podemos aproveitar e trazer a lista de grupos de o usuário faz parte, usando o `depth = 1`:
-```python title="myapi/core/schemas.py"
+
+```python title="./myapi/core/schemas.py"
 from django.contrib.auth import get_user_model
 from ninja.orm import create_schema
 
@@ -134,7 +137,7 @@ UserSchemaWithGroups = create_schema(
 
 E agora a rota de GET da API é facinho:
 
-```python title="myapi/core/api.py"
+```python title="./myapi/core/api.py"
 import uuid
 from .schemas import (
     StatusSchema,
@@ -173,7 +176,7 @@ def get_user_detail(request, id: uuid.UUID):
 
 E agora vamos criar um teste para esse endpoint:
 
-```python title="myapi/core/tests/test_users.py"
+```python title="./myapi/core/tests/test_users.py"
 from http import HTTPStatus
 
 import pytest
@@ -201,11 +204,12 @@ def test_get_user_detail(client):
 ```
 
 ### Post
+
 Aqui é o mesmo esquema, vamos criar um Schema para o POST, e a rota do POST, e o teste de criação de usuário.
 
 Para o Schema, vamos pedir como input da API apenas o usuário, nome, sobrenome, email e senha:
 
-```python title="myapi/core/models.py"
+```python title="./myapi/core/models.py"
 class UserCreateSchema(Schema):
     username: str = Field(..., example='newuser')
     first_name: str = Field(..., example='Firstname')
@@ -215,7 +219,8 @@ class UserCreateSchema(Schema):
 ```
 
 Agora a API. Aqui vamos colocar uma lógica para ele já barrar usuários com username ou e-mail repetidos. E o retorno de sucesso da API vai ser um 201 CREATED ao invés de 200 OK.
-```python title="myapi/core/api.py"
+
+```python title="./myapi/core/api.py"
 from ninja.responses import Response
 from .schemas import (
     StatusSchema,
@@ -253,7 +258,8 @@ def create_users(request, data: UserCreateSchema):
 ```
 
 Agora vamos testar as situações de criar um novo usuário com sucesso, e de criar usuários repetidos esperando um erro:
-```python title="myapi/core/tests/test_users.py"
+
+```python title="./myapi/core/tests/test_users.py"
 @pytest.mark.django_db
 def test_create_users_success(client):
     user_payload = {
@@ -300,7 +306,7 @@ def test_create_users_duplicated_email(client):
 
 O Delete não recebe nenhum payload, então não precisamos criar nenhum Schema novo. Vamos criar apenas a API e o teste. A API vai retornar un 204 NO CONTENT no caso de sucesso na deleção:
 
-```python title="myapi/core/api.py"
+```python title="./myapi/core/api.py"
 @router.delete(
     'users/{id}',
     summary='Delete user',
@@ -314,7 +320,8 @@ def delete_user(request, id: uuid.UUID):
 ```
 
 Agora vamos testar
-```python title="myapi/core/tests/test_users.py"
+
+```python title="./myapi/core/tests/test_users.py"
 @pytest.mark.django_db
 def test_delete_user(client):
     user_payload = {
@@ -332,10 +339,10 @@ def test_delete_user(client):
 ```
 
 ### Patch
- 
+
 Por fim, faremos o PATCH. Mas no caso do Patch a gente precisa de um Payload na request, então vamos criar um Schema novo:
 
-```python title="myapi/core/schemas.py"
+```python title="./myapi/core/schemas.py"
 class UserPatchSchema(Schema):
     username: str | None = None
     first_name: str | None = None
@@ -344,7 +351,8 @@ class UserPatchSchema(Schema):
 ```
 
 Agora vamos importar esse Schema na API e usar no Patch:
-```python title="myapi/core/api.py"
+
+```python title="./myapi/core/api.py"
 from .schemas import (
     StatusSchema,
     UserCreateSchema,
@@ -370,7 +378,8 @@ def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
 ```
 
 E agora o teste:
-```python title="myapi/core/tests/test_users.py"
+
+```python title="./myapi/core/tests/test_users.py"
 @pytest.mark.django_db
 def test_patch_user(client):
     response = create_user()
@@ -394,7 +403,7 @@ def test_patch_user(client):
 
 Show, nosso CRUD de Usuários ta pronto. Então os arquivos ficaram assim:
 
-```python title="myapi/core/schemas.py"
+```python title="./myapi/core/schemas.py"
 from django.contrib.auth import get_user_model
 from ninja import Field, ModelSchema, Schema
 from ninja.orm import create_schema
@@ -440,8 +449,7 @@ class UserPatchSchema(Schema):
 
 ```
 
-
-```python title="myapi/core/api.py"
+```python title="./myapi/core/api.py"
 import uuid
 from http import HTTPStatus
 from django.db import connection
@@ -571,7 +579,7 @@ def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
     return Response(UserWithGroupsSchema.from_orm(user), status=200)
 ```
 
-```python title="myapi/core/tests/test_users.py"
+```python title="./myapi/core/tests/test_users.py"
 import json
 from http import HTTPStatus
 from django.contrib.auth import get_user_model

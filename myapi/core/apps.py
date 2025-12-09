@@ -10,7 +10,6 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         # Create/update default superuser after migrations run.
-        # Keep imports local to avoid side-effects during Django startup.
         def create_default_superuser(sender, **kwargs):
             User = get_user_model()
             username = config('DJANGO_ADMIN_USER', default='admin')

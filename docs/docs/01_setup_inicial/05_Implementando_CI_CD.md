@@ -2,16 +2,15 @@
 
 Nesse capítulo, vamos implementar o CI/CD nesse projeto através de Workflows do GitHub Action. A ideia é que ao fazer um Pull Request para a branch `main`, o Workflow será chamado para:
 
-* Executar os testes
-* Rodar o Linter com o Ruff
-* Fazer deploy no servidor
+- Executar os testes
+- Rodar o Linter com o Ruff
+- Fazer deploy no servidor
 
 !!! note
 
-  Nesse exemplo, vou subir a aplicação toda em uma VPS da Hostinger. Nesse ambiente, eu já tenho um container de Traefik configurado, que vou deixar documentando nesse [apêndice](../Appendix/01_Configurando_o_Traefik.md).
-  
-  O Traefik vai servir como um Reverse Proxy, encaminhando as solicitações HTTPS dos clients para esse container. E por fins de exemplos, implementaremos esse Backend na URL https://myapi.brunononogaki.com. 
+Nesse exemplo, vou subir a aplicação toda em uma VPS da Hostinger. Nesse ambiente, eu já tenho um container de Traefik configurado, que vou deixar documentando nesse [apêndice](../Appendix/01_Configurando_o_Traefik.md).
 
+O Traefik vai servir como um Reverse Proxy, encaminhando as solicitações HTTPS dos clients para esse container. E por fins de exemplos, implementaremos esse Backend na URL https://myapi.brunononogaki.com.
 
 ## Criando Workflow de Testes
 
@@ -23,7 +22,7 @@ mkdir -p .github/workflows
 
 Agora dentro dessa pasta, vamos criar o arquivo `tests.yaml`
 
-```yaml title=".github/workflows/tests.yaml"
+```yaml title="./.github/workflows/tests.yaml"
 name: Automated Tests
 
 on: pull_request
@@ -34,13 +33,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "Download code"    
+      - name: "Download code"
         uses: actions/checkout@v4
 
       - name: "Install Python 3.13"
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'    
+          python-version: "3.13"
 
       - name: "Install Poetry"
         run: pipx install poetry
@@ -53,19 +52,19 @@ jobs:
 ```
 
 !!! note
-    
+
     É importante termos o arquivo .env.development no repositório, porque o nosso script do `task test` utiliza ele para criar um link simbólico para o .env.
 
 Agora, se a gente criar uma nova branch, commitar esse arquivo, fazer um git pull, e depois um Pull Request, esse job será chamado.
+
 ```bash
 git checkout -b "action/tests"
 git add .
 git commit -m "Adding tests workflow"
-git push --set-upstream origin actions/tests 
+git push --set-upstream origin actions/tests
 ```
 
 ![alt text](static/test-workflow.png)
-
 
 !!! warning
 
@@ -82,12 +81,11 @@ git push --set-upstream origin actions/tests
         * Adicione o check `pytest`
       * Block force pushes
 
-
 ## Criando o Workflow de Lint
 
 O Workflow de Linting será o mesmo padrão, porque já temos o comando `task link` no nosso arquivo `pyproject.toml`. Então basta criar esse novo Workflow, subir para o repositório, e configurar esse job nas configurações do `Require status checks to pass`, para assim impedir que alguém faça um merge para a main sem rodar o `ruff`.
 
-```yaml title=".github/workflows/lint.yaml"
+```yaml title="./.github/workflows/lint.yaml"
 name: Linting
 
 on: pull_request
@@ -98,13 +96,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "Download code"    
+      - name: "Download code"
         uses: actions/checkout@v4
 
       - name: "Install Python 3.13"
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'    
+          python-version: "3.13"
 
       - name: "Install Poetry"
         run: pipx install poetry
@@ -119,10 +117,9 @@ jobs:
 ![alt text](static/lint-workflow.png)
 
 !!! warning
-        
+
     Ops, veja agora que o linter falhou, e com isso a gente não consegue fazer o merge na branch `main`!
     Mas vou corrigir isso pelo VSCode mesmo, vendo erro por erro e atacando a resolução. Por isso é importante fazer isso logo no começo do projeto, para não acumular muita coisa para consertar. O Copilot ou alguma outra IA podem te dar uma boa mão na resolução desses problemas
-
 
 ## Criando os Scripts para Deployment em Produção
 
@@ -131,12 +128,12 @@ Vamos preparar a infraestrutura para o Deployment em produção. Criaremos basic
 Além disso, vamos criar também um script `deploy.sh` pra ficar mais fácil de subir tudo.
 
 Começando com o arquivo do docker-compose, vamos declarar dois containers:
-* Um container de Postgres, com a diferença que aqui em Prod temos que mapear o volume para os dados persistirem caso ele reinicie. E aqui não vamos expor nenhuma porta, porque o nosso servidor web vai conseguir falar internamente através da network do docker.
-* Um container do nosso Web Server Django, configurado para utilizar o Traefik como Reverse proxy, escutando na URL **myapi.brunononogaki.com**, porta 443 (HTTPS), e encaminhando para a porta 8000 do container.
 
+- Um container de Postgres, com a diferença que aqui em Prod temos que mapear o volume para os dados persistirem caso ele reinicie. E aqui não vamos expor nenhuma porta, porque o nosso servidor web vai conseguir falar internamente através da network do docker.
+- Um container do nosso Web Server Django, configurado para utilizar o Traefik como Reverse proxy, escutando na URL **myapi.brunononogaki.com**, porta 443 (HTTPS), e encaminhando para a porta 8000 do container.
 
-```yaml title="infra/compose-pro.yaml"
-version: '3.9'
+```yaml title="./infra/compose-pro.yaml"
+version: "3.9"
 
 services:
   database:
@@ -144,11 +141,11 @@ services:
     image: postgres:17.0
     env_file:
       - ../.env.production
-    restart: unless-stopped    
+    restart: unless-stopped
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
-      - my-network            
+      - my-network
     logging:
       driver: "json-file"
       options:
@@ -170,7 +167,7 @@ services:
       - "traefik.http.services.myapi.loadbalancer.server.port=8000"
       - "traefik.docker.network=my-network"
     networks:
-      - my-network      
+      - my-network
     depends_on:
       - database
     restart: unless-stopped
@@ -194,7 +191,7 @@ networks:
 
 E o `Dockerfile-pro` ficará assim:
 
-```Dockerfile title="infra/Docuerfile-pro"
+```Dockerfile title="./infra/Docuerfile-pro"
 FROM python:3.13-slim
 
 
@@ -220,7 +217,7 @@ CMD ["uvicorn", "myapi.asgi:application", "--host", "0.0.0.0", "--port", "8000"]
 
 Agora se dermos um `docker compose --file infra/compose-pro.yaml up -d`, os dois containers irão subir. Mas para ficar mais fácil depois na hora de criarmos o nosso Workflow do GitHub Actions, vamos criar um arquivo `deploy.sh`, com permissão de execução. Outra coisa que o script vai fazer também é criar o link simbólico do arquivo `.env.production` para `.env`. Assim, não precisamos fazer nada disso no script do Workflow.
 
-```shell title="/deploy.sh"
+```shell title="./deploy.sh"
 #!/bin/bash
 
 # Deploy script for production environment
@@ -264,16 +261,14 @@ exit 1
 
     Pronto! Agora, em teoria, se você acessar o servidor manualmente, criar um arquivo `.env.production` lá dentro com os dados do seu ambiente, e rodar um `./deploy.sh`, o serviço de banco e web deverão subir com sucesso!
 
-
-
 ## Criando o Workflow de Deploy na VPS da Hostinger
 
 E agora vamos criar o nosso workflow de Deploy em uma VPS da Hostinger. Eis o que iremos precisar:
 
-* IP do servidor na Hostinger
-* Usuário
-* Chave SSH
-* Diretório no servidor onde colocarmos o código
+- IP do servidor na Hostinger
+- Usuário
+- Chave SSH
+- Diretório no servidor onde colocarmos o código
 
 !!! tip
 
@@ -286,14 +281,14 @@ E agora vamos criar o nosso workflow de Deploy em uma VPS da Hostinger. Eis o qu
 
 Com posse dessas informações, vamos criar as SECRETS dentro do nosso repositório no GitHub.
 
-* No repositório no GitHub, vá em `Settings`
-* Vá para o menu `Secrets and variables` -> `Actions`  
-* Clique em `New repository secret`, e crie as seguintes variáveis:
-  * DEPLOY_HOST: IP do seu servidor
-  * DEPLOY_USER: Usuário para logar no servidor. Nesse caso, usaremos o `root` mesmo, pois é só um lab.
-  * DEPLOY_SSH_KEY: Conteúdo da Chave Privada gerada anteriormente
-  * DEPLOY_PORT: 22, que é a porta padrão do SSH. Mas caso o seu servidor escute por outra porta, é só ajustar
-  * DEPLOY_PATH: /root/django-ninja-boilerplate, ou o diretório que você deseja colocar o código no servidor
+- No repositório no GitHub, vá em `Settings`
+- Vá para o menu `Secrets and variables` -> `Actions`
+- Clique em `New repository secret`, e crie as seguintes variáveis:
+  - DEPLOY_HOST: IP do seu servidor
+  - DEPLOY_USER: Usuário para logar no servidor. Nesse caso, usaremos o `root` mesmo, pois é só um lab.
+  - DEPLOY_SSH_KEY: Conteúdo da Chave Privada gerada anteriormente
+  - DEPLOY_PORT: 22, que é a porta padrão do SSH. Mas caso o seu servidor escute por outra porta, é só ajustar
+  - DEPLOY_PATH: /root/django-ninja-boilerplate, ou o diretório que você deseja colocar o código no servidor
 
 Vai ficar assim:
 
@@ -301,7 +296,7 @@ Vai ficar assim:
 
 E agora vamos criar o nosso workflow de deploy, com a diferença que não chamaremos ele nos pull requests, mas sim quando houver algum push na branch main. E usaremos as actions `rsync-deployments` para copiar o código do repo para o servidor, e o `ssh-action` para rodar o script de deploy.
 
-```yaml title=".github/workflows/deploy.yaml"
+```yaml title="./.github/workflows/deploy.yaml"
 name: Deploy to VPS
 
 on:
@@ -348,12 +343,12 @@ jobs:
     A primeira execução desse Workflow vai falhar, porque não temos o arquivo `.env.production` criado. Então quando ele rodar pela primeira vez e criar a pasta com o projeto, acesse o servidor e crie o arquivo `.env.production` manualmente. A partir disso, o workflow vai funcionar, porque no setp de `Sync code to server`, estamos excluindo do rsync o arquivo .env.production, para que ele não seja removido.
 
 Agora, quando você fizer um push para a branch main, os containers do WebServer e do Banco de Dados irão subir:
+
 ```bash
 CONTAINER ID   IMAGE                    COMMAND                  CREATED         STATUS                 PORTS                                                                                          NAMES
 60055a3d99e3   infra-web                "uvicorn myapi.asgi:…"   50 minutes ago   Up 50 minutes         8000/tcp                                                                                       django-ninja-prod
 056561459f60   postgres:17.0            "docker-entrypoint.s…"   6 seconds ago   Up 6 seconds           5432/tcp                                                                                       postgres-prod
 ```
-
 
 !!! success
 
