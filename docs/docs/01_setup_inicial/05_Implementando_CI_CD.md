@@ -161,7 +161,7 @@ services:
       - ../.env.production
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.myapi.rule=Host(`myapi.brunononogaki.com`)"
+      - "traefik.http.routers.myapi.rule=Host(`${BACKEND_URL}`)"
       - "traefik.http.routers.myapi.entrypoints=websecure"
       - "traefik.http.routers.myapi.tls=true"
       - "traefik.http.services.myapi.loadbalancer.server.port=8000"
@@ -191,7 +191,7 @@ networks:
 
 E o `Dockerfile-pro` ficará assim:
 
-```Dockerfile title="./infra/Docuerfile-pro"
+```Dockerfile title="./infra/Dockerfile-pro"
 FROM python:3.13-slim
 
 
@@ -241,7 +241,7 @@ if [ "$1" = "up" ] || [ -z "$1" ]; then
   # Symlink .env.production to .env
   ln -sf .env.production .env
   # Build and start containers
-  docker compose --file infra/compose-pro.yaml --project-name django-ninja up -d --build
+  docker compose --env-file .env.production --file infra/compose-pro.yaml --project-name django-ninja up -d --build
   # Run migrations inside the web container
   WEB_CONTAINER=$(docker compose --file infra/compose-pro.yaml ps -q web)
   if [ -n "$WEB_CONTAINER" ]; then
