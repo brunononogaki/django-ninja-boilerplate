@@ -7,7 +7,7 @@ User = get_user_model()
 
 
 class StatusSchema(Schema):
-    status: str
+    updated_at: str
     db_version: str
     max_connections: int
     active_connections: int
