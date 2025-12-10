@@ -126,7 +126,7 @@ services:
       - ../.env.production
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.myapi.rule=Host(`myapi.brunononogaki.com`)"
+      - "traefik.http.routers.myapi.rule=Host(`${BACKEND_FQDN}`)"
       - "traefik.http.routers.myapi.entrypoints=websecure"
       - "traefik.http.routers.myapi.tls=true"
       - "traefik.http.services.myapi.loadbalancer.server.port=8000"
