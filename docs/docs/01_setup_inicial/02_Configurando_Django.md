@@ -139,6 +139,7 @@ Agora sim vamos criar a nossa primeira API de status. A ideia é que a rota `api
 Na pasta `core`, vamos criar um arquivo chamado `api.py`, onde incluiremos as nossas rotas:
 
 ```python title="./myapi/core/api.py"
+from datetime import datetime
 from django.db import connection
 from http import HTTPStatus
 from ninja import Router
@@ -170,7 +171,7 @@ def status(request):
         active_connections = int(cursor.fetchone()[0])
 
     return HTTPStatus.OK, {
-        'status': 'ok',
+        'updated_at': str(datetime.now())
         'db_version': db_version,
         'max_connections': max_connections,
         'active_connections': active_connections,
@@ -183,7 +184,7 @@ E vamos também definir o Schema que é usado no retorno dessa API
 from ninja import Schema
 
 class StatusSchema(Schema):
-    status: str
+    updated_at: str
     db_version: str
     max_connections: int
     active_connections: int
@@ -260,11 +261,10 @@ def test_status(client):
     response_json = response.json()
 
     assert response.status_code == HTTPStatus.OK
-    assert 'status' in response_json
+    assert 'updated_at' in response_json
     assert 'db_version' in response_json
     assert 'max_connections' in response_json
     assert 'active_connections' in response_json
-    assert response_json.get('status') == 'ok'
     assert 'PostgreSQL 17' in response_json.get('db_version')
     assert int(response_json.get('max_connections'))
     assert int(response_json.get('active_connections'))

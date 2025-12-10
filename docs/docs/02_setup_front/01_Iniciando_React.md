@@ -137,7 +137,7 @@ services:
       - ../pages:/app/pages
       - ../public:/app/public
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_APP_API_URL}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     command: npm run dev
     restart: unless-stopped
     env_file:
