@@ -83,7 +83,7 @@ BACKEND_FQDN=myapi.brunononogaki.com
 FRONTEND_FQDN=react.brunononogaki.com
 
 # FRONTEND CONFIG
-NEXT_APP_API_URL=myapi.brunononogaki.com
+NEXT_PUBLIC_API_URL=myapi.brunononogaki.com
 
 # BACKEND CONFIG
 SECRET_KEY='mysecretkey-dev'

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from http import HTTPStatus
 
 from django.contrib.auth import authenticate, get_user_model
@@ -44,7 +45,7 @@ def status(request):
         active_connections = int(cursor.fetchone()[0])
 
     return HTTPStatus.OK, {
-        'status': 'ok',
+        'updated_at': str(datetime.now()),
         'db_version': db_version,
         'max_connections': max_connections,
         'active_connections': active_connections,

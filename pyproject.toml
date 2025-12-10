@@ -13,7 +13,8 @@ dependencies = [
     "python-decouple (>=3.8,<4.0)",
     "psycopg (>=3.2.13,<4.0.0)",
     "uvicorn (>=0.38.0,<0.39.0)",
-    "pyjwt (>=2.10.1,<3.0.0)"
+    "pyjwt (>=2.10.1,<3.0.0)",
+    "django-cors-headers (>=4.9.0,<5.0.0)"
 ]
 
 [tool.poetry]
@@ -51,7 +52,7 @@ pythonpath = "."
 addopts = '-p no:warnings'
 
 [tool.taskipy.tasks]
-services-up = "docker compose -f infra/compose-dev.yaml up -d && docker compose -f next/infra/compose-dev.yaml up -d"
+services-up = "docker compose -f infra/compose-dev.yaml up -d && docker compose -f next/infra/compose-dev.yaml build && docker compose -f next/infra/compose-dev.yaml up -d"
 services-stop = "docker compose -f infra/compose-dev.yaml stop && docker compose -f next/infra/compose-dev.yaml stop"
 services-down = "docker compose -f infra/compose-dev.yaml down && docker compose -f next/infra/compose-dev.yaml down"
 create-env-dev = "ln -sf .env.development .env"
