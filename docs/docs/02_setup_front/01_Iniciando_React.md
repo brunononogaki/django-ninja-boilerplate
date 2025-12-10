@@ -102,7 +102,7 @@ Vamos criar um container no ambiente de dev para subir o front, e depois podemos
 
 Para o ambiente de `dev`, podemos subir o React com o `npm run dev`.
 
-Primeiro vamos criar um Dockerfile para _buildar_ uma imagem de Node com o React:
+Primeiro vamos criar um Dockerfile para _buildar_ uma imagem de Node com o React.
 
 ```Dockerfile title="./next/infra/Dockerfile-dev"
 FROM node:20-alpine
@@ -129,7 +129,7 @@ services:
   frontend-dev:
     build:
       context: ..
-      dockerfile: infra/Dockerfile-dev
+      dockerfile: infra/Dockerfile-dev 
     container_name: myfront-dev
     ports:
       - "3000:3000"
@@ -189,12 +189,21 @@ RUN npm install
 
 COPY . .
 
+# Build argument for environment variable
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 RUN npm run build
 
 EXPOSE 3000
 
 CMD ["npm", "start"]
 ```
+
+
+!!! note
+
+    Eu precisarei usar a variável `NEXT_PUBLIC_API_URL` do meu .env futuramente, e ela precisa ser carregada no container na etapa de build, para eu poder chamá-la no código com um `process.env.NEXT_PUBLIC_API_URL`. Por isso, declarei ela aqui no arquivo Dockerfile.
 
 E agora o compose:
 
@@ -206,6 +215,8 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile-pro
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}      
     container_name: frontend-prod
     expose:
       - "3000"
@@ -241,7 +252,13 @@ networks:
 
 ## Arrumando o script de deploy
 
-Para que o nosso workflow de deploy no Github Actions consiga subir esse container também, precisaremos editar o arquivo `./deploy.sh`:
+Para que o nosso workflow de deploy no Github Actions consiga subir esse container também, precisaremos editar o arquivo `./deploy.sh`.
+
+
+!!! note
+
+    Repare que agora nos comandos de docker compose, passamos também o parâmetro `--env-file`, para ele carregar o .env. Caso contrário, como o .env não está na mesma pasta do compose.yml, o docker compose não cosegue carregar as variáveis.
+
 
 ```shell title="./deploy.sh" hl_lines="10 31-33"
 #!/bin/bash
@@ -272,11 +289,11 @@ if [ "$1" = "up" ] || [ -z "$1" ]; then
 
   # Build and start backend containers
   echo "📦 Building and starting backend..."
-  docker compose --file infra/compose-pro.yaml --project-name django-ninja up -d --build
+  docker compose --env-file .env.production --file infra/compose-pro.yaml --project-name django-ninja up -d --build
 
   # Build and start frontend containers
   echo "📦 Building and starting frontend..."
-  docker compose --file next/infra/compose-pro.yaml --project-name django-ninja up -d --build
+  docker compose --env-file .env.production --file next/infra/compose-pro.yaml --project-name django-ninja up -d --build
 
   # Run migrations inside the web container
   WEB_CONTAINER=$(docker compose --file infra/compose-pro.yaml ps -q web)
@@ -294,3 +311,7 @@ fi
 echo "Usage: $0 [up|down]"
 exit 1
 ```
+
+!!! success
+
+    Feito! Agora o nosso front-end está disponível na produção, em https://react.brunononogaki.com
