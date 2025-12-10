@@ -19,7 +19,7 @@ export default function StatusPage() {
 
 function UpdatedAt() {
   const { isLoading, data } = useSWR(
-    `http://${process.env.NEXT_PUBLIC_API_URL}/api/v1/status`,
+    `${process.env.NEXT_PUBLIC_API_URL}/api/v1/status`,
     fetchAPI,
     {
       refreshInterval: 2000,
@@ -36,7 +36,7 @@ function UpdatedAt() {
 
 function DatabaseStatus() {
   const { isLoading, data } = useSWR(
-    `http://${process.env.NEXT_PUBLIC_API_URL}/api/v1/status`,
+    `${process.env.NEXT_PUBLIC_API_URL}/api/v1/status`,
     fetchAPI,
     {
       refreshInterval: 2000,
