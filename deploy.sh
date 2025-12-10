@@ -26,11 +26,11 @@ if [ "$1" = "up" ] || [ -z "$1" ]; then
   
   # Build and start backend containers
   echo "📦 Building and starting backend..."
-  docker compose --file infra/compose-pro.yaml --project-name django-ninja up -d --build
+  docker compose --env-file .env.production --file infra/compose-pro.yaml --project-name django-ninja up -d --build
   
   # Build and start frontend containers
   echo "📦 Building and starting frontend..."
-  docker compose --file next/infra/compose-pro.yaml --project-name django-ninja up -d --build
+  docker compose --env-file .env.production --file next/infra/compose-pro.yaml --project-name django-ninja up -d --build
   
   # Run migrations inside the web container
   WEB_CONTAINER=$(docker compose --file infra/compose-pro.yaml --project-name django-ninja ps -q web)
