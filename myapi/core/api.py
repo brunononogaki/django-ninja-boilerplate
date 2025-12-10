@@ -1,6 +1,6 @@
 import uuid
-from http import HTTPStatus
 from datetime import datetime
+from http import HTTPStatus
 
 from django.contrib.auth import authenticate, get_user_model
 from django.db import connection
