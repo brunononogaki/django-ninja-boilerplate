@@ -10,6 +10,7 @@ nav:
     - 04. Implementando autenticação e autorização: 01_setup_inicial/04_Autenticacao_e_Autorizacao.md
     - 05. Implementando CI/CD: 01_setup_inicial/05_Implementando_CI_CD.md
     - 06. Implementando Linting de commits: 01_setup_inicial/06_Commit_linting.md
+    - 07. Padronizando Erros: 01_setup_inicial/07_Padronizando_Erros.md
   - Setup do Front-End (React):
     - 01. Iniciando um projeto React com Next.js: 02_setup_front/01_Iniciando_React.md
     - 02. Criando a página de status: 02_setup_front/02_Pagina_Status.md

@@ -50,3 +50,5 @@ class TokenResponse(Schema):
 
 class ErrorSchema(Schema):
     detail: str
+    status_code: int | None = None
+    action: str | None = None
