@@ -28,7 +28,7 @@ def test_login_invalid_credentials(client):
     )
     data = response.json()
     assert response.status_code == HTTPStatus.UNAUTHORIZED
-    assert data['detail'] == 'Invalid credentials'
+    assert data['message'] == 'Invalid credentials.'
 
 
 @pytest.mark.django_db

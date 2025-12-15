@@ -14,7 +14,8 @@ dependencies = [
     "psycopg (>=3.2.13,<4.0.0)",
     "uvicorn (>=0.38.0,<0.39.0)",
     "pyjwt (>=2.10.1,<3.0.0)",
-    "django-cors-headers (>=4.9.0,<5.0.0)"
+    "django-cors-headers (>=4.9.0,<5.0.0)",
+    "loguru (>=0.7.3,<0.8.0)"
 ]
 
 [tool.poetry]
@@ -61,8 +62,8 @@ run = 'task create-env-dev && task services-up && python infra/wait-for-postgres
 down = "pkill -f 'manage.py runserver'; task services-down"
 test = 'task create-env-dev && task services-up && python infra/wait-for-postgres.py && honcho start web test'
 test-watch = 'pytest-watch'
-lint = 'ruff check'
-format = 'ruff format'
+lint = 'ruff check --select I --fix'
+format = 'task lint && ruff format'
 migrate = 'python manage.py makemigrations && python manage.py migrate'
 commit = 'poetry run cz commit'
 
