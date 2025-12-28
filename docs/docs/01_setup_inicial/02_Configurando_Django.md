@@ -4,7 +4,7 @@ Agora que já temos a nossa infra toda configurada, vamos começar a subir o Dja
 
 ## Criando a app `core`:
 
-Para começar a nossa API, vamos criar uma app nova chamada `core`, que vai ter coisas relacionadas ao sistema, como API de check de status e de gerência de usuários. Posteriormente criaremos outras apps para a nossa API.
+Para começar a nossa API, vamos criar uma app nova chamada `core`, que vai ter coisas relacionadas ao sistema, como API de check de status e de autenticação. Posteriormente criaremos outras apps para a nossa API.
 
 Para a estrutura de pastas das apps ficarem dentro da pasta do projeto "myapi˜, vamos primeiro dar um cd no "myapi" e criar o app a partir de lá. Desse jeito, acho que fica mais organizado:
 
@@ -301,9 +301,12 @@ E agora vamos rodar o `task test`:
 
 Show, os testes passaram!!!
 
-Agora uma forma legal de programar no VSCode é dividir o terminal em dois. Em um você roda o `task run`, e no outro você deixa rodando o `task test-watch`. Dessa forma, sempre que você for alterando algum arquivo e salvando, o VSCode roda os testes.
 
-![alt text](static/tests_vscode.png)
+!!! tip
+
+    Agora uma forma legal de programar no VSCode é dividir o terminal em dois. Em um você roda o `task run`, e no outro você deixa rodando o `task test-watch`. Dessa forma, sempre que você for alterando algum arquivo e salvando, o VSCode roda os testes.
+
+    ![alt text](static/tests_vscode.png)
 
 ## Criando usuário admin padrão
 
