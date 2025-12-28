@@ -62,6 +62,30 @@ def test_list_users_unauthorized(client, create_non_admin_access_token):
 
 
 @pytest.mark.django_db
+def test_list_users_filter_by_id(client, create_admin_access_token):
+    User = get_user_model()
+    admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
+
+    response = client.get(f'/api/v1/users?id={admin.id}', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert data['items'][0]['username'] == config('DJANGO_ADMIN_USER')
+
+
+@pytest.mark.django_db
+def test_list_users_filter_by_username(client, create_admin_access_token):
+    response = client.get(
+        f'/api/v1/users?username={config("DJANGO_ADMIN_USER")}',
+        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
+    )
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert data['items'][0]['username'] == config('DJANGO_ADMIN_USER')
+
+
+@pytest.mark.django_db
 def test_get_user_detail_admin(client, create_admin_access_token):
     User = get_user_model()
     admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
@@ -86,11 +110,25 @@ def test_get_user_detail_admin_to_other_user(client, create_admin_access_token, 
 
 
 @pytest.mark.django_db
-def test_get_user_detail_user_to_himself(client, create_non_admin_access_token):
+def test_get_user_detail_user_to_himself_by_id(client, create_non_admin_access_token):
     User = get_user_model()
     user = User.objects.get(username='new_user_non_admin')
 
     response = client.get(f'/api/v1/users/{user.id}', HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}')
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert data['username'] == 'new_user_non_admin'
+
+
+@pytest.mark.django_db
+def test_get_user_detail_user_to_himself_by_username(client, create_non_admin_access_token):
+    User = get_user_model()
+    user = User.objects.get(username='new_user_non_admin')
+
+    response = client.get(
+        f'/api/v1/users/username/{user.username}', HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}'
+    )
     data = response.json()
 
     assert response.status_code == HTTPStatus.OK

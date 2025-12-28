@@ -19,3 +19,4 @@ def handle_api_exception(request, exc):
 
 
 api.add_router('', 'myapi.core.api.router')
+api.add_router('', 'myapi.users.api.router')

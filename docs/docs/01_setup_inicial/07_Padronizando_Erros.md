@@ -266,7 +266,7 @@ class UnauthorizedError(APIException):
 
 E agora podemos chamar esses erros, por exemplo:
 
-```python title="./myapi/core/api.py" hl_lines="6-9"
+```python title="./myapi/users/api.py" hl_lines="6-9"
 @router.post(
     'users', response=UserWithGroupsSchema, summary='Create user', description='Create a new user', auth=AdminAuth()
 )
@@ -309,7 +309,7 @@ def handle_not_found(request, exc):
 
 Mas para termos maior controle, prefiro deixarmos de usar o `get_object_or_404` e passar a usar try/excepts normais. Por exemplo, na rota de DELETE de Users:
 
-```python title="./myapi/core/api.py"
+```python title="./myapi/users/api.py"
 @router.delete(
     'users/{id}', summary='Delete user', response={204: None}, description='Delete an user', auth=OwnerOrAdminAuth()
 )
@@ -328,64 +328,26 @@ def delete_user(request, id: uuid.UUID):
 
 Adicionando os demais tratamentos de erro e logging no arquivo, teremos esse resultado final:
 
-```python title="./myapi/core/api.py"
+```python title="./myapi/users/api.py"
 import uuid
-from datetime import datetime
-from http import HTTPStatus
 
-from django.contrib.auth import authenticate, get_user_model
-from django.db import connection
+from django.contrib.auth import get_user_model
 from loguru import logger
-from ninja import Form, Router
+from ninja import Router
 from ninja.pagination import paginate
 from ninja.responses import Response
 
-from .auth import AdminAuth, OwnerOrAdminAuth, create_token
-from .exceptions import ConflictError, NotFoundError, ServiceError, UnauthorizedError
+from ..core.auth import AdminAuth, OwnerOrAdminAuth
+from ..core.exceptions import ConflictError, NotFoundError
 from .schemas import (
-    ErrorSchema,
-    StatusSchema,
-    TokenResponse,
     UserCreateSchema,
     UserPatchSchema,
     UserWithGroupsSchema,
 )
 
-router = Router(tags=['Admin'])
+router = Router(tags=['Users'])
 
 User = get_user_model()
-
-
-@router.get(
-    'status',
-    response=StatusSchema,
-    summary='Status Check',
-    description='Status check endpoint to monitor the API health.',
-)
-def status(request):
-    try:
-        with connection.cursor() as cursor:
-            # Database version
-            cursor.execute('SELECT version()')
-            db_version = cursor.fetchone()[0]
-
-            # Maximum number of connections
-            cursor.execute('SHOW max_connections')
-            max_connections = int(cursor.fetchone()[0])
-
-            # Active connections
-            cursor.execute('SELECT count(*) FROM pg_stat_activity')
-            active_connections = int(cursor.fetchone()[0])
-
-        return HTTPStatus.OK, {
-            'updated_at': str(datetime.now()),
-            'db_version': db_version,
-            'max_connections': max_connections,
-            'active_connections': active_connections,
-        }
-    except Exception as e:
-        logger.error(f'Database Error: {e}')
-        raise ServiceError(message='Ocorreu um erro ao acessar o banco de dados ou executar uma query.')
 
 
 ##############
@@ -477,22 +439,8 @@ def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
     user.save()
     logger.info(f'User {user.username} (id={id}) updated by {request.auth} - fields: {list(updated_fields.keys())}')
     return Response(UserWithGroupsSchema.from_orm(user), status=200)
-
-
-########
-# AUTH
-#######
-@router.post('login', tags=['Auth'], response={200: TokenResponse, 401: ErrorSchema})
-def login(request, username: str = Form(...), password: str = Form(...)):
-    user = authenticate(username=username, password=password)
-    if not user:
-        logger.warning(f'Failed login attempt for username: {username}')
-        raise UnauthorizedError()
-    logger.info(f'User {user.username} (id={user.id}) logged in')
-    tokens = create_token(user)
-    return 200, {'access_token': tokens.get('access_token') or tokens.get('access'), 'token_type': 'bearer', **tokens}
 ```
 
 !!! success
 
-    Agora temos implementado um tratamento de erros customizado, padronização nos retornos da API, e loggins usando o `loguru`.
+    Agora temos implementado um tratamento de erros customizado, padronização nos retornos da API, e logging usando o `loguru`.

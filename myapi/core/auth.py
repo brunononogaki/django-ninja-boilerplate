@@ -58,19 +58,23 @@ class OwnerOrAdminAuth(JWTAuth):
         if not user:
             return None
 
-        target_id = None
+        target_identifier = None
         try:
-            # Pega o ID do usuário fazendo o request
-            target_id = str(request.path).split('/')[-1]
+            # Pega o ID ou username do último segmento do path
+            target_identifier = str(request.path).split('/')[-1]
         except Exception:
-            target_id = None
+            target_identifier = None
 
-        # Se não há target_id, só admins tem acesso
-        if not target_id:
+        # Se não há target_identifier, só admins tem acesso
+        if not target_identifier:
             return user if getattr(user, 'is_staff', False) else None
 
-        # permitir se for admin ou se for o próprio usuário
-        if getattr(user, 'is_staff', False) or str(user.id) == str(target_id):
+        # Verifica se é admin
+        if getattr(user, 'is_staff', False):
+            return user
+
+        # Para não-admins, verifica se é o próprio usuário (por ID ou username)
+        if str(user.id) == str(target_identifier) or user.username == target_identifier:
             return user
 
         return None
