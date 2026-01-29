@@ -15,7 +15,7 @@ nav:
     - 02. Criando a página de status: 02_setup_front/02_Pagina_Status.md    
   - Usuários e Autenticação:   
     - 01. Fazendo o CRUD de Users: 03_usuarios_autenticacao/01_CRUD_de_Users.md   
-    - 02. Implementando autenticação e autorização: 03_usuarios_autenticacao/04_Autenticacao_e_Autorizacao.md
+    - 02. Implementando autenticação e autorização: 03_usuarios_autenticacao/02_Autenticacao_e_Autorizacao.md
 
   - Apêndice:
     - 01. Configurando o Traefik: Appendix/01_Configurando_o_Traefik.md    
