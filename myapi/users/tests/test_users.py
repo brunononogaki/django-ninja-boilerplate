@@ -18,7 +18,7 @@ def create_admin_access_token(client):
 
 
 @pytest.fixture
-def create_non_admin_access_token(client, create_admin_access_token):
+def create_non_admin_access_token(client):
     # Create new non-admin user
     user_payload = {
         'username': 'new_user_non_admin',
@@ -31,8 +31,13 @@ def create_non_admin_access_token(client, create_admin_access_token):
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
     )
+
+    # Activate the user (he was created as inactive)
+    User = get_user_model()
+    user = User.objects.get(username='new_user_non_admin')
+    user.is_active = True
+    user.save()
 
     # Get the auth token for the non-admin user
     response = client.post(
@@ -147,7 +152,7 @@ def test_get_user_detail_user_to_other_user_fail(client, create_non_admin_access
 
 
 @pytest.mark.django_db
-def test_create_users_success(client, create_admin_access_token):
+def test_create_users_success(client):
     user_payload = {
         'username': 'admin_new',
         'first_name': 'New',
@@ -159,7 +164,6 @@ def test_create_users_success(client, create_admin_access_token):
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
     )
     response_json = response.json()
 
@@ -167,22 +171,22 @@ def test_create_users_success(client, create_admin_access_token):
     assert response_json['username'] == user_payload['username']
 
 
-@pytest.mark.django_db
-def test_create_users_unauthorized(client, create_non_admin_access_token):
-    user_payload = {
-        'username': 'admin_new',
-        'first_name': 'New',
-        'last_name': 'Admin',
-        'email': 'admin_new@admin.com',
-        'password': 'myadminpassword',
-    }
-    response = client.post(
-        '/api/v1/users',
-        data=json.dumps(user_payload),
-        content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
-    )
-    assert response.status_code == HTTPStatus.UNAUTHORIZED
+# @pytest.mark.django_db
+# def test_create_users_unauthorized(client, create_non_admin_access_token):
+#     user_payload = {
+#         'username': 'admin_new',
+#         'first_name': 'New',
+#         'last_name': 'Admin',
+#         'email': 'admin_new@admin.com',
+#         'password': 'myadminpassword',
+#     }
+#     response = client.post(
+#         '/api/v1/users',
+#         data=json.dumps(user_payload),
+#         content_type='application/json',
+#         HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
+#     )
+#     assert response.status_code == HTTPStatus.UNAUTHORIZED
 
 
 @pytest.mark.django_db
