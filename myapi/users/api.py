@@ -89,9 +89,7 @@ def get_user_detail_by_username(request, username: str):
     return user
 
 
-@router.post(
-    'users', response=UserWithGroupsSchema, summary='Create user', description='Create a new user', auth=AdminAuth()
-)
+@router.post('users', response=UserWithGroupsSchema, summary='Create user', description='Create a new user', auth=None)
 def create_users(request, data: UserCreateSchema):
     # Pre-create validation: check username and email uniqueness
     if User.objects.filter(username=data.username).exists():
@@ -107,9 +105,10 @@ def create_users(request, data: UserCreateSchema):
         last_name=data.last_name,
         email=data.email,
         password=data.password,
+        is_active=False,
     )
 
-    logger.info(f'User {user.username} (id={user.id}) created by {request.auth}')
+    logger.info(f'User {user.username} (id={user.id}) created')
     return Response(UserWithGroupsSchema.from_orm(user), status=201)
 
 

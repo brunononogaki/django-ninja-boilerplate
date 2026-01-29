@@ -9,7 +9,6 @@ from ninja import Form, Router
 from .auth import create_token
 from .exceptions import ServiceError, UnauthorizedError
 from .schemas import (
-    ErrorSchema,
     StatusSchema,
     TokenResponse,
 )
@@ -55,7 +54,7 @@ def status(request):
 ##############
 # AUTH
 ##############
-@router.post('login', tags=['Auth'], response={200: TokenResponse, 401: ErrorSchema})
+@router.post('login', tags=['Auth'], response=TokenResponse)
 def login(request, username: str = Form(...), password: str = Form(...)):
     user = authenticate(username=username, password=password)
     if not user:

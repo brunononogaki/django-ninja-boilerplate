@@ -1,8 +1,10 @@
 # Implementando Autenticação e Autorização
 
+Então até agora temos os nossos CRUDs de usuários criados, mas no momento qualquer pessoa anônima pode listar, criar, alterar e deletar dados da tabela. A ideia é começarmos a proteger essas rotas. Por uma questão de design, optei por deixar o endpoint de criação (POST) aberto, pois o usuário anônimo poderá fazer o seu cadastro. Dependendo do sistema, você pode deixar isso como sendo apenas uma tarefa de um `admin`, por exemplo. No nosso boilerplate, o usuário poderá fazer a criação, mas ele precisará ativar a sua conta através de um e-mail, que vamos implementar mais pra frente!
+
 ## Autenticação JWT
 
-Vamos implantar a autenticação por meio de tokens JWT. Para isso, vamos instalar o `PyJWT`
+Vamos implantar a autenticação da API por meio de tokens JWT. Para isso, vamos instalar o `PyJWT`
 
 ```bash
 poetry add PyJWT
@@ -56,16 +58,13 @@ class JWTAuth(HttpBearer):
             return None
 ```
 
-Agora precisamos criar a rota de geração de Token. Mas antes, vamos criar dois schemas para o retorno da rota de gerar token:
+Agora precisamos criar a rota de geração de Token. Mas antes, vamos criar o schema para o retorno da rota de gerar token:
 
 ```python title="./myapi/core/schemas.py"
 class TokenResponse(Schema):
     access_token: str
     refresh_token: str | None = None
     token_type: str = 'bearer'
-
-class ErrorSchema(Schema):
-    detail: str
 ```
 
 Agora sim vamos criar a rota de `login`:
@@ -77,14 +76,15 @@ from .auth import create_token, JWTAuth
 from .schemas import (
     StatusSchema,
     TokenResponse,  #<= Adicione isso
-    ErrorSchema,    #<= Adicione isso
 )
 
-@router.post('login', tags=['Auth'], response={200: TokenResponse, 401: ErrorSchema})
+@router.post('login', tags=['Auth'], response=TokenResponse)
 def login(request, username: str = Form(...), password: str = Form(...)):
     user = authenticate(username=username, password=password)
     if not user:
-        return 401, {'detail': 'Invalid credentials'}
+        logger.warning(f'Failed login attempt for username: {username}')
+        raise UnauthorizedError()
+    logger.info(f'User {user.username} (id={user.id}) logged in')
     tokens = create_token(user)
     return 200, {'access_token': tokens.get('access_token') or tokens.get('access'), 'token_type': 'bearer', **tokens}
 ```
@@ -343,7 +343,7 @@ def test_patch_user(client, create_admin_access_token):
 
 ## Autorização
 
-Por enquanto, estamos apenas validando se o usuário está autenticado para poder executar essas operações, mas na verdade a gente precisa que apenas Usuários **ADMIN** possam fazer certas operações, como criar, listar, deletar e alterar usuários. Não queremos que um usuário qualquer logado posso fazer isso, né? Aí que entra a autorização.
+Por enquanto, estamos apenas validando se o usuário está autenticado para poder executar essas operações, mas na verdade a gente precisa que apenas Usuários **ADMIN** possam fazer certas operações, como listar, deletar e alterar usuários. Não queremos que um usuário qualquer logado posso fazer isso, né? Aí que entra a autorização.
 
 Faremos o seguinte: o usuário admin pode fazer tudo isso, mas o usuário não admin poderá listar os detalhes dele mesmo, alterar as configurações dele mesmo, e apagar ele mesmo.
 
@@ -406,11 +406,11 @@ def list_users(request):
 
 Agora quando um usuário normal (não admin) tentar chamar essa rota, ele vai tomar um erro 401. Mas vamos criar testes para isso. Antes, vou aplicar essa mudança nas rotas de get e post. O Patch e Delete vamos fazer diferente, porque um usuário poderia também chamá-las se o usuário destino for eles mesmos.
 
-Para testar, criaremos uma nova Fixture que autentica um usuário não admin, e usamos esse access token nas rotas que precisam de admin, para confirmar se a API retorna 401:
+Para testar, criaremos uma nova Fixture que cria um usuário não admin, ativa ele, e o autentica. Usaremos esse access token nas rotas que precisam de admin, para confirmar se a API retorna 401:
 
 ```python title="./myapi/users/tests/test_users.py"
 @pytest.fixture
-def create_non_admin_access_token(client, create_admin_access_token):
+def create_non_admin_access_token(client):
     # Create new non-admin user
     user_payload = {
         'username': 'new_user_non_admin',
@@ -423,8 +423,13 @@ def create_non_admin_access_token(client, create_admin_access_token):
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
     )
+
+    # Activate the user (he was created as inactive)
+    User = get_user_model()
+    user = User.objects.get(username='new_user_non_admin')
+    user.is_active = True
+    user.save()
 
     # Get the auth token for the non-admin user
     response = client.post(

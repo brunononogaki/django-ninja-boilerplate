@@ -264,7 +264,7 @@ class UnauthorizedError(APIException):
         super().__init__(message, name, status_code)
 ```
 
-E agora podemos chamar esses erros, por exemplo:
+Futuramente, quando implementarmos por exemplo o endpoint de `/users`, usaremos esses erros da seguinte forma:
 
 ```python title="./myapi/users/api.py" hl_lines="6-9"
 @router.post(
@@ -290,7 +290,7 @@ def create_users(request, data: UserCreateSchema):
 
 ## Erros de 404: Not found
 
-Para os erros de `404: Not Found`, como estávamos usando o método `get_object_or_404`, ele lança uma exceção `Http404` que não passa pelo nosso exception_handler customizado. Então temos duas opções: uma é registrar um `exception handler` para o `Http404`, que serviria para todos os erros 404 que utilizam o método `get_object_or_404` do Django:
+Para os erros de `404: Not Found`, o Django possui um método padrão `get_object_or_404`, mas ele lança uma exceção `Http404` que não passa pelo nosso exception_handler customizado. Então temos duas opções: uma é registrar um `exception handler` para o `Http404`, que serviria para todos os erros 404 que utilizam o método `get_object_or_404` do Django:
 
 ```python title="./myapi/api.py"
 from django.http import Http404
@@ -307,7 +307,7 @@ def handle_not_found(request, exc):
     )
 ```
 
-Mas para termos maior controle, prefiro deixarmos de usar o `get_object_or_404` e passar a usar try/excepts normais. Por exemplo, na rota de DELETE de Users:
+Mas para termos maior controle, prefiro deixarmos de usar o `get_object_or_404` e passar a usar try/excepts normais. Por exemplo, na rota de DELETE de Users (implementação futura):
 
 ```python title="./myapi/users/api.py"
 @router.delete(
@@ -322,123 +322,6 @@ def delete_user(request, id: uuid.UUID):
 
     user.delete()
     return Response(None, status=204)
-```
-
-## Tratando erros e logs na API
-
-Adicionando os demais tratamentos de erro e logging no arquivo, teremos esse resultado final:
-
-```python title="./myapi/users/api.py"
-import uuid
-
-from django.contrib.auth import get_user_model
-from loguru import logger
-from ninja import Router
-from ninja.pagination import paginate
-from ninja.responses import Response
-
-from ..core.auth import AdminAuth, OwnerOrAdminAuth
-from ..core.exceptions import ConflictError, NotFoundError
-from .schemas import (
-    UserCreateSchema,
-    UserPatchSchema,
-    UserWithGroupsSchema,
-)
-
-router = Router(tags=['Users'])
-
-User = get_user_model()
-
-
-##############
-# Users
-##############
-@router.get(
-    'users', response=list[UserWithGroupsSchema], summary='List users', description='List users', auth=AdminAuth()
-)
-@paginate
-def list_users(request):
-    return User.objects.all()
-
-
-@router.get(
-    'users/{id}',
-    response=UserWithGroupsSchema,
-    summary='Get user detail',
-    description='Retrieve user details by ID',
-    auth=OwnerOrAdminAuth(),
-)
-def get_user_detail(request, id: uuid.UUID):
-    try:
-        user = User.objects.get(id=id)
-    except User.DoesNotExist:
-        logger.warning(f'Attempt to retrieve non-existent user: {id}')
-        raise NotFoundError('User not found')
-    logger.info(f'User {user.username} (id={id}) retrieved by {request.auth}')
-    return user
-
-
-@router.post(
-    'users', response=UserWithGroupsSchema, summary='Create user', description='Create a new user', auth=AdminAuth()
-)
-def create_users(request, data: UserCreateSchema):
-    # Pre-create validation: check username and email uniqueness
-    if User.objects.filter(username=data.username).exists():
-        logger.warning(f'Attempt to create user with existing username: {data.username}')
-        raise ConflictError('Username already exists')
-    if User.objects.filter(email=data.email).exists():
-        logger.warning(f'Attempt to create user with existing email: {data.email}')
-        raise ConflictError('Email already exists')
-
-    user = User.objects.create_user(
-        username=data.username,
-        first_name=data.first_name,
-        last_name=data.last_name,
-        email=data.email,
-        password=data.password,
-    )
-
-    logger.info(f'User {user.username} (id={user.id}) created by {request.auth}')
-    return Response(UserWithGroupsSchema.from_orm(user), status=201)
-
-
-@router.delete(
-    'users/{id}', summary='Delete user', response={204: None}, description='Delete an user', auth=OwnerOrAdminAuth()
-)
-def delete_user(request, id: uuid.UUID):
-    # user = get_object_or_404(User, id=id)
-    try:
-        user = User.objects.get(id=id)
-    except User.DoesNotExist:
-        logger.warning(f'Attempt to delete non-existent user: {id}')
-        raise NotFoundError('User not found')
-
-    logger.info(f'User {user.username} (id={id}) deleted by {request.auth}')
-    user.delete()
-    return Response(None, status=204)
-
-
-@router.patch(
-    'users/{id}',
-    response=UserWithGroupsSchema,
-    summary='Update user partially',
-    description='Update only specified user fields',
-    auth=OwnerOrAdminAuth(),
-)
-def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
-    try:
-        user = User.objects.get(id=id)
-    except User.DoesNotExist:
-        logger.warning(f'Attempt to update non-existent user: {id}')
-        raise NotFoundError('User not found')
-
-    updated_fields = payload.dict(exclude_unset=True)
-    for field, value in updated_fields.items():
-        setattr(user, field, value)
-
-    user.save()
-    logger.info(f'User {user.username} (id={id}) updated by {request.auth} - fields: {list(updated_fields.keys())}')
-    return Response(UserWithGroupsSchema.from_orm(user), status=200)
 ```
 
 !!! success

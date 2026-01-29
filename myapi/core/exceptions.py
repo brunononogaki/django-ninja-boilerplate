@@ -15,10 +15,7 @@ class ServiceError(APIException):
     """Raised when services fails."""
 
     def __init__(
-        self,
-        message: str = 'An unknown Service Error occurred.',
-        name: str = 'ServiceError',
-        status_code: int = 503
+        self, message: str = 'An unknown Service Error occurred.', name: str = 'ServiceError', status_code: int = 503
     ):
         super().__init__(message, name, status_code)
 
@@ -27,10 +24,7 @@ class ValidationError(APIException):
     """Raised when validation fails."""
 
     def __init__(
-        self,
-        message: str = 'Validation error occurred.',
-        name: str = 'ValidationError',
-        status_code: int = 400
+        self, message: str = 'Validation error occurred.', name: str = 'ValidationError', status_code: int = 400
     ):
         super().__init__(message, name, status_code)
 
@@ -38,34 +32,19 @@ class ValidationError(APIException):
 class NotFoundError(APIException):
     """Raised when resource is not found."""
 
-    def __init__(
-        self,
-        message: str = 'Resource not found.',
-        name: str = 'NotFoundError',
-        status_code: int = 404
-    ):
+    def __init__(self, message: str = 'Resource not found.', name: str = 'NotFoundError', status_code: int = 404):
         super().__init__(message, name, status_code)
 
 
 class ConflictError(APIException):
     """Raised when resource already exists."""
 
-    def __init__(
-        self,
-        message: str = 'Resource already exists.',
-        name: str = 'ConflictError',
-        status_code: int = 409
-    ):
+    def __init__(self, message: str = 'Resource already exists.', name: str = 'ConflictError', status_code: int = 409):
         super().__init__(message, name, status_code)
 
 
 class UnauthorizedError(APIException):
     """Raised when authentication fails."""
 
-    def __init__(
-        self,
-        message: str = 'Invalid credentials.',
-        name: str = 'UnauthorizedError',
-        status_code: int = 401
-    ):
+    def __init__(self, message: str = 'Invalid credentials.', name: str = 'UnauthorizedError', status_code: int = 401):
         super().__init__(message, name, status_code)

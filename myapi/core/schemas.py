@@ -12,9 +12,3 @@ class TokenResponse(Schema):
     access_token: str
     refresh_token: str | None = None
     token_type: str = 'bearer'
-
-
-class ErrorSchema(Schema):
-    detail: str
-    status_code: int | None = None
-    action: str | None = None
