@@ -1,6 +1,6 @@
 # Implementando CD/CD
 
-Nesse capítulo, vamos implementar o CI/CD nesse projeto através de Workflows do GitHub Action. A ideia é que ao fazer um Pull Request para a branch `main`, o Workflow será chamado para:
+Por enquanto o nosso sistema ainda não tem muita coisa produtiva, mas já temos a estrutura do projeto e uma rota para conferir o status da aplicação. Nesse capítulo, vamos implementar o CI/CD nesse projeto através de Workflows do GitHub Action. A ideia é que ao fazer um Pull Request para a branch `main`, o Workflow será chamado para:
 
 - Executar os testes
 - Rodar o Linter com o Ruff
@@ -8,9 +8,9 @@ Nesse capítulo, vamos implementar o CI/CD nesse projeto através de Workflows d
 
 !!! note
 
-Nesse exemplo, vou subir a aplicação toda em uma VPS da Hostinger. Nesse ambiente, eu já tenho um container de Traefik configurado, que vou deixar documentando nesse [apêndice](../Appendix/01_Configurando_o_Traefik.md).
+    Nesse exemplo, vou subir a aplicação toda em uma VPS da Hostinger. Nesse ambiente, eu já tenho um container de Traefik configurado, que vou deixar documentando nesse [apêndice](../Appendix/01_Configurando_o_Traefik.md).
 
-O Traefik vai servir como um Reverse Proxy, encaminhando as solicitações HTTPS dos clients para esse container. E por fins de exemplos, implementaremos esse Backend na URL https://myapi.brunononogaki.com.
+    O Traefik vai servir como um Reverse Proxy, encaminhando as solicitações HTTPS dos clients para esse container. E por fins de exemplos, implementaremos esse Backend na URL https://myapi.brunononogaki.com.
 
 ## Criando Workflow de Testes
 

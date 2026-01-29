@@ -504,3 +504,7 @@ def test_list_users_filter_by_username(client):
     assert response.status_code == HTTPStatus.OK
     assert data['items'][0]['username'] == config('DJANGO_ADMIN_USER')
 ```
+
+!!! success
+
+    Temos agora uma nova app chamada `users`, que faz um CRUD básico na tabela de usuários, e no GET podemos inclusive passar alguns filtros, como o username por exemplo. Mas ainda não temos nada de autenticação e autorização implementado, qualquer usuário anônimo pode mexer a vontade no sistema. Vamos arrumar isso a seguir!
