@@ -174,6 +174,8 @@ Show, os testes passaram!!!
 
     Agora uma forma legal de programar no VSCode é dividir o terminal em dois. Em um você roda o `task run`, e no outro você deixa rodando o `task test-watch`. Dessa forma, sempre que você for alterando algum arquivo e salvando, o VSCode roda os testes.
 
+    E para rodar o watch em apenas um arquivo, você pode fazer por exemplo: `task test-watch -- myapi/core/tests/test_auth.py -v`
+
     ![alt text](static/tests_vscode.png)
 
 ## Criando usuário admin padrão
