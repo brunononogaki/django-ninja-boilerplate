@@ -168,9 +168,14 @@ E criar um novo arquivo na raíz chamado `pytest.ini`:
 [pytest]
 DJANGO_SETTINGS_MODULE = myapi.settings
 python_files = tests.py test_*.py *_tests.py
-addopts = -p no:warnings
+addopts = -p no:warnings -v
 ```
 
+!!! tip
+
+    Caso queira ver os logs e prints serem exibidos também no terminal a cada teste, adicione a flag -s, assim: `addopts = -p no:warnings -v -s`
+
+    
 Como já temos os comandos do Taskipy configurados, podemos usar o `task test` ou o `task test-watch` (modo real-time) para rodar os testes. Voltaremos a essas configurações mais pra frente.
 
 ## Subindo um Banco de Dados Local (Dev)

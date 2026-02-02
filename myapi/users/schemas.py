@@ -15,7 +15,7 @@ class UserSchema(ModelSchema):  # <= Não está sendo usado, é apenas para refe
 UserWithGroupsSchema = create_schema(
     User,
     depth=1,
-    fields=['id', 'username', 'first_name', 'last_name', 'email', 'groups'],
+    fields=['id', 'username', 'first_name', 'last_name', 'email', 'is_active', 'groups'],
     custom_fields=[('get_full_name', str, None)],
 )
 

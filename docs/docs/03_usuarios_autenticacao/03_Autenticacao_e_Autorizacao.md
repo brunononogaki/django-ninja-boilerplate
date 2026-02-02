@@ -1,6 +1,6 @@
 # Implementando Autenticação e Autorização
 
-Então até agora temos os nossos CRUDs de usuários criados, mas no momento qualquer pessoa anônima pode listar, criar, alterar e deletar dados da tabela. A ideia é começarmos a proteger essas rotas. Por uma questão de design, optei por deixar o endpoint de criação (POST) aberto, pois o usuário anônimo poderá fazer o seu cadastro. Dependendo do sistema, você pode deixar isso como sendo apenas uma tarefa de um `admin`, por exemplo. No nosso boilerplate, o usuário poderá fazer a criação, mas ele precisará ativar a sua conta através de um e-mail, que vamos implementar mais pra frente!
+Então até agora temos os nossos CRUDs de usuários criados, assim como a rota para ativar uma conta através de um Activation Token, mas no momenton não temos como fazer o login, e qualquer pessoa anônima (não logada) pode listar, criar, alterar e deletar dados da tabela. A ideia é começarmos a proteger essas rotas.
 
 ## Autenticação JWT
 
@@ -14,7 +14,7 @@ poetry add PyJWT
 
     Toda a API de autenticação será criada dentro da app `core`, que criamos no começo do projeto, e que até agora só tinha a rota de `/status`.
 
-Agora vamos criar um arquivo em `./myapi/core/auth.py`, para colocar as funções de criação do token e de autenticação, ambas usando a lib `jwt`
+Agora vamos criar um arquivo em `./myapi/core/auth.py`, para colocar a função de criação do token, usando a lib `jwt`.
 
 ```python title="./myapi/core/auth.py"
 import jwt
@@ -42,23 +42,9 @@ def create_token(user):
         algorithm=ALGO,
     )
     return {'access_token': access_token, 'refresh_token': refresh_token}
-
-
-class JWTAuth(HttpBearer):
-    def authenticate(self, request, token):
-        try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGO])
-            if payload.get('type') != 'access':
-                return None
-            user_id = payload.get('user_id')
-            return User.objects.get(id=user_id)
-        except jwt.ExpiredSignatureError:
-            return None
-        except Exception:
-            return None
 ```
 
-Agora precisamos criar a rota de geração de Token. Mas antes, vamos criar o schema para o retorno da rota de gerar token:
+Agora precisamos criar a rota de geração de Token (`/login`). Mas antes, vamos criar o schema para o retorno dessa rota, e para esse cenário, esperamos receber um access_token, e um refresh_token, que poderá ser usado para renovar o access token antes de ele expirar.
 
 ```python title="./myapi/core/schemas.py"
 class TokenResponse(Schema):
@@ -67,11 +53,11 @@ class TokenResponse(Schema):
     token_type: str = 'bearer'
 ```
 
-Agora sim vamos criar a rota de `login`:
+Agora sim vamos criar a rota de `/login`:
 
 ```python title="./myapi/core/api.py" hl_lines="6-7"
 from django.contrib.auth import get_user_model, authenticate
-from .auth import create_token, JWTAuth
+from .auth import create_token
 
 from .schemas import (
     StatusSchema,
@@ -86,10 +72,18 @@ def login(request, username: str = Form(...), password: str = Form(...)):
         raise UnauthorizedError()
     logger.info(f'User {user.username} (id={user.id}) logged in')
     tokens = create_token(user)
-    return 200, {'access_token': tokens.get('access_token') or tokens.get('access'), 'token_type': 'bearer', **tokens}
+    return 200, {'token_type': 'bearer', **tokens}
 ```
 
-E agora para proteger uma rota é só colocar um `auth=JWTAuth()`. Por exemplo, vamos proteger a rota de GET em `/users`:
+!!! success
+
+    Agora temos um novo endpoint `/login`, que é capaz de autenticar um usuário baseado no username e password, e caso a autenticação ocorra com sucesso, ele retorna um access token, que deverá ser usado no Header das futuras requisições, nesse formato: `Authorization: Bearer + <access_token>`
+
+## Protegendo as rotas
+
+Por enquanto temos o sistema de geração de Tokens funcional, mas as rotas ainda não sabem que precisam receber o token no header, e para isso também usaremos a biblioteca do `jwt`.
+
+No Djando, para proteger uma rota é só colocar um `auth=JWTAuth()` no decorator. Por exemplo, para proteger a rota de GET em `/users`:
 
 ```python title="./myapi/users/api.py" hl_lines="1 8"
 from ..core.auth import JWTAuth
@@ -106,9 +100,46 @@ def list_users(request):
     ...
 ```
 
+Ao fazer isso, o Django Ninja faz assim:
+
+1. Extrai o token do header `Authorization: Bearer {token}`
+2. Chama o método `authenticate(request, token)` da classe `JWTAuth`
+3. O método decodifica o JWT usando `jwt.decode()`, que **automaticamente valida**:
+   - Se o token está válido (assinatura correta)
+   - Se o token não está expirado
+4. Retorna o usuário autenticado (ou None se qualquer validação falhar)
+
+Aqui está a classe `JWTAuth` implementada no `auth.py`:
+
+```python title="./myapi/core/auth.py"
+class JWTAuth(HttpBearer):
+    @staticmethod
+    def authenticate(self, request, token):
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGO])
+            if payload.get('type') != 'access':
+                return None
+            user_id = payload.get('user_id')
+            return User.objects.get(id=user_id)
+        except jwt.ExpiredSignatureError:
+            return None
+        except Exception:
+            return None
+```
+
+!!! success
+
+    Dessa forma, apenas adicionando o `auth=JWTAuth()` já estaremos restringindo o endpoint apenas para usuários logados (com um token válido). Ainda não estamos validando se o usuário tem permissão para executar a ação, e isso é o que iremos implementar já já.
+
 ## Testando o endpoint de Login
 
-Agora vamos criar os testes para o endpoint de login:
+Agora vamos criar os testes para o endpoint de login. Vamos cobrir os seguintes casos:
+
+1. Login com sucesso do usuário admin (que já está ativo)
+2. Login com sucesso de um novo usário após ser ativado
+3. Login sem sucesso de um usuário inativo
+4. Login sem sucesso de um usuário com credenciais inválidas
+5. Login sem sucesso de um request faltando dados de usuário e senha
 
 ```python title="./myapi/core/tests/test_auth.py"
 import json
@@ -133,6 +164,35 @@ def test_login_success(client):
     assert 'access_token' in data
     assert data['token_type'] == 'bearer'
     assert 'refresh_token' in data
+
+
+@pytest.mark.django_db
+def test_login_inactive_user(client):
+    """Test that inactive users cannot login"""
+    # Create a new user (created as inactive by default)
+    user_payload = {
+        'username': 'inactive_user',
+        'first_name': 'Inactive',
+        'last_name': 'User',
+        'email': 'inactive@test.com',
+        'password': 'testpassword',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    assert response.status_code == HTTPStatus.CREATED
+
+    # Try to login with inactive user
+    response = client.post(
+        '/api/v1/login',
+        data={'username': 'inactive_user', 'password': 'testpassword'},
+    )
+
+    # Should return 403 Forbidden
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+
 
 @pytest.mark.django_db
 def test_login_invalid_credentials(client):
@@ -180,162 +240,9 @@ def test_list_users(client, create_admin_access_token):
     assert data['items'][0]['username'] == 'admin'
 ```
 
-E agora os testes todos de Users corrigidos para fazer a autenticação antes de rodar os requests:
+!!! warning
 
-```python title="./myapi/users/tests/test_users.py"
-import json
-from http import HTTPStatus
-from decouple import config
-from django.contrib.auth import get_user_model
-
-import pytest
-
-
-@pytest.fixture
-def create_admin_access_token(client):
-    response = client.post(
-        '/api/v1/login',
-        data={'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')},
-    )
-    response_json = response.json()
-    access_token = response_json['access_token']
-    return access_token
-
-
-@pytest.mark.django_db
-def test_list_users(client, create_admin_access_token):
-    response = client.get('/api/v1/users', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
-    data = response.json()
-
-    assert response.status_code == HTTPStatus.OK
-    assert data['count'] == 1
-    assert data['items'][0]['username'] == 'admin'
-
-
-@pytest.mark.django_db
-def test_get_user_detail(client, create_admin_access_token):
-    User = get_user_model()
-    admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
-
-    response = client.get(f'/api/v1/users/{admin.id}', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
-    data = response.json()
-
-    assert response.status_code == HTTPStatus.OK
-    assert data['username'] == config('DJANGO_ADMIN_USER')
-
-
-@pytest.mark.django_db
-def test_create_users_success(client, create_admin_access_token):
-    user_payload = {
-        'username': 'admin_new',
-        'first_name': 'New',
-        'last_name': 'Admin',
-        'email': 'admin_new@admin.com',
-        'password': 'myadminpassword',
-    }
-    response = client.post(
-        '/api/v1/users',
-        data=json.dumps(user_payload),
-        content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
-    )
-    response_json = response.json()
-
-    assert response.status_code == HTTPStatus.CREATED
-    assert response_json['username'] == user_payload['username']
-
-
-@pytest.mark.django_db
-def test_create_users_duplicated_username(client, create_admin_access_token):
-    user_payload = {
-        'username': 'admin',
-        'first_name': 'New',
-        'last_name': 'Admin',
-        'email': 'admin_new@admin.com',
-        'password': 'myadminpassword',
-    }
-    response = client.post(
-        '/api/v1/users',
-        data=json.dumps(user_payload),
-        content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
-    )
-    assert response.status_code == HTTPStatus.CONFLICT
-
-
-@pytest.mark.django_db
-def test_create_users_duplicated_email(client, create_admin_access_token):
-    user_payload = {
-        'username': 'admin_new',
-        'first_name': 'New',
-        'last_name': 'Admin',
-        'email': 'admin@admin.com',
-        'password': 'myadminpassword',
-    }
-    response = client.post(
-        '/api/v1/users',
-        data=json.dumps(user_payload),
-        content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
-    )
-    assert response.status_code == HTTPStatus.CONFLICT
-
-
-@pytest.mark.django_db
-def test_delete_user(client, create_admin_access_token):
-    user_payload = {
-        'username': 'admin_new',
-        'first_name': 'New',
-        'last_name': 'Admin',
-        'email': 'admin_new@admin.com',
-        'password': 'myadminpassword',
-    }
-    response = client.post(
-        '/api/v1/users',
-        data=json.dumps(user_payload),
-        content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
-    )
-    user_id = response.json()['id']
-
-    response = client.delete(f'/api/v1/users/{user_id}', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
-    assert response.status_code == HTTPStatus.NO_CONTENT
-
-
-@pytest.mark.django_db
-def test_patch_user(client, create_admin_access_token):
-    user_payload = {
-        'username': 'admin_new',
-        'first_name': 'New',
-        'last_name': 'Admin',
-        'email': 'admin_new@admin.com',
-        'password': 'myadminpassword',
-    }
-    response = client.post(
-        '/api/v1/users',
-        data=json.dumps(user_payload),
-        content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
-    )
-    user_id = response.json()['id']
-
-    patch_data = {
-        'first_name': 'NewName',
-        'email': 'newemail@admin.com',
-    }
-
-    response = client.patch(
-        f'/api/v1/users/{user_id}',
-        data=json.dumps(patch_data),
-        content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
-    )
-
-    response_json = response.json()
-    assert response.status_code == HTTPStatus.OK
-    assert response_json['first_name'] == 'NewName'
-    assert response_json['email'] == 'newemail@admin.com'
-```
+    Todos os testes devem ser corrigidos para receber a fixture `create_admin_access_token`, e passar o token no header da requisição.
 
 !!! success
 
@@ -345,7 +252,7 @@ def test_patch_user(client, create_admin_access_token):
 
 Por enquanto, estamos apenas validando se o usuário está autenticado para poder executar essas operações, mas na verdade a gente precisa que apenas Usuários **ADMIN** possam fazer certas operações, como listar, deletar e alterar usuários. Não queremos que um usuário qualquer logado posso fazer isso, né? Aí que entra a autorização.
 
-Faremos o seguinte: o usuário admin pode fazer tudo isso, mas o usuário não admin poderá listar os detalhes dele mesmo, alterar as configurações dele mesmo, e apagar ele mesmo.
+Faremos o seguinte: o usuário admin pode fazer tudo isso, mas o usuário não admin (porém ativo) poderá listar os detalhes dele mesmo, alterar as configurações dele mesmo, e apagar ele mesmo.
 
 Vamos começar com as rotas que são permitidas apenas pelos admins. Uma forma fácil seria verificar dentro da própria rota com a propriedade `is_staff`, assim:
 
@@ -361,9 +268,10 @@ def list_users(request):
 
 Mas se formos usar isso em muitas rotas, compensa criar uma classe que valida se o usuário é Admin, e colocamos ela no decorator de cada rota. Vamos implementar dessa forma. No arquivo `auth.py`, vamos adicionar a classe AdminAuth, herdando do `JWTAuth` que já tinhamos criado antes:
 
-```python title="./myapi/core/auth.py"
+```python title="./myapi/core/auth.py" hl_lines="16-24"
 # Classe já existente
 class JWTAuth(HttpBearer):
+    @staticmethod
     def authenticate(self, request, token):
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGO])
@@ -389,22 +297,22 @@ class AdminAuth(JWTAuth):
 
 E agora no `api.py` vamos importar essa classe e chamá-la no decorator das rotas que precisam de permissão de Admin:
 
-```python title="./myapi/users/api.py"
-from ..core.auth import create_token, JWTAuth, AdminAuth
+```python title="./myapi/users/api.py" hl_lines="8"
+from ..core.auth import JWTAuth, AdminAuth
 
 @router.get(
     'users',
     response=list[UserWithGroupsSchema],
     summary='List users',
-    description='List users',
-    auth=AdminAuth() #<= Alterar aqui
+    description='List users or filter by id/username',
+    auth=AdminAuth(),
 )
 @paginate
-def list_users(request):
+def list_users(request, id: uuid.UUID = None, username: str = None):
     ...
 ```
 
-Agora quando um usuário normal (não admin) tentar chamar essa rota, ele vai tomar um erro 401. Mas vamos criar testes para isso. Antes, vou aplicar essa mudança nas rotas de get e post. O Patch e Delete vamos fazer diferente, porque um usuário poderia também chamá-las se o usuário destino for eles mesmos.
+Agora quando um usuário normal (não admin) tentar chamar essa rota, ele vai tomar um erro 401. Mas vamos criar testes para isso. As rotas de `GET` de detalhes de usuário, de `PATCH` e `DELETE` vamos fazer diferente, porque um usuário não admin poderia também chamá-las caso o usuário destino for eles mesmos.
 
 Para testar, criaremos uma nova Fixture que cria um usuário não admin, ativa ele, e o autentica. Usaremos esse access token nas rotas que precisam de admin, para confirmar se a API retorna 401:
 
@@ -445,26 +353,9 @@ def test_list_users_unauthorized(client, create_non_admin_access_token):
     response = client.get('/api/v1/users', HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}')
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
-
-@pytest.mark.django_db
-def test_create_users_unauthorized(client, create_non_admin_access_token):
-    user_payload = {
-        'username': 'admin_new',
-        'first_name': 'New',
-        'last_name': 'Admin',
-        'email': 'admin_new@admin.com',
-        'password': 'myadminpassword',
-    }
-    response = client.post(
-        '/api/v1/users',
-        data=json.dumps(user_payload),
-        content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
-    )
-    assert response.status_code == HTTPStatus.UNAUTHORIZED
 ```
 
-Ótimo, agora para as rotas de UPDATE, DELETE e GET USER DETAIL, vamos validar se o usuário logado é admin ou se é ele mesmo. Para todas essas rotas a gente passa o id no request, então precisamos comparar se o id é o mesmo do id do usuário logado. Também tem várias formas de implementar isso, mas para manter consistência, vamos fazer da mesma forma, criando uma classe OwnerOrAdminAuth, herdando de JWTAuth, e chamando no decorator das rotas.
+Ótimo, agora para as rotas de `UPDATE`, `DELETE` e `GET` de detalhes de usuários, vamos validar se o usuário logado é admin ou se é ele mesmo. Para todas essas rotas a gente passa o id do usuário alvo na URL do request, então precisamos comparar se o id é o mesmo do id do usuário logado. Também tem várias formas de implementar isso, mas para manter consistência, vamos fazer da mesma forma, criando uma classe `OwnerOrAdminAuth`, herdando de `JWTAuth`, e chamando no decorator das rotas.
 
 ```python title="./myapi/core/auth.py"
 class OwnerOrAdminAuth(JWTAuth):
@@ -498,7 +389,7 @@ class OwnerOrAdminAuth(JWTAuth):
 Agora na API é só importar a classe e chamar nos decorators:
 
 ```python title="./myapi/users/api.py" hl_lines="8"
-from ..core.auth import create_token, JWTAuth, AdminAuth, OwnerOrAdminAuth
+from ..core.auth import JWTAuth, AdminAuth, OwnerOrAdminAuth
 
 @router.get(
     'users/{id}',
@@ -511,10 +402,9 @@ def get_user_detail(request, id: uuid.UUID):
     ...
 ```
 
-Vamos aplicar a mesma coisa nas rotas de PATCH e DELETE, e fazer os testes.
+Vamos aplicar a mesma coisa nas rotas de `PATCH` e `DELETE`, e fazer os testes.
 
 ```python title="./myapi/users/tests/test_users.py"
-
 # Teste do admin fazendo o GET nele mesmo
 @pytest.mark.django_db
 def test_get_user_detail_admin(client, create_admin_access_token):
@@ -651,5 +541,4 @@ def test_patch_user_to_other_user_fail(client, create_non_admin_access_token):
 
 !!! success
 
-    Com isso a gente termina a Autenticação e Autorização do CRUD de Users, commit:
-    
+    Com isso a gente termina a Autenticação e Autorização do CRUD de Users

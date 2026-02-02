@@ -2,10 +2,10 @@
 
 Para praticarmos um pouco de CRUD básico no Django Ninja, vamos desenvolver o CRUD de usuários, que é um Model que já vem por padrão no Django. Mas vamos aumentar um pouco a complexidade reescrevendo esse Model padrão para alterar o id de `int` para `UUID`.
 
-
 ## Criando a app `users`
 
 Primeiramente, vamos criar uma nova `app` para `users`:
+
 ```bash
 cd myapi
 python ../manage.py startapp users
@@ -154,7 +154,7 @@ User = get_user_model()
 UserSchemaWithGroups = create_schema(
     User,
     depth=1,
-    fields=['id', 'username', 'first_name', 'last_name', 'email', 'groups'],
+    fields=['id', 'username', 'first_name', 'last_name', 'email', 'is_active', 'groups'],
     custom_fields=[('get_full_name', str, None)],
 )
 ```
@@ -205,7 +205,16 @@ def list_users(request):
     description='Retrieve user details by ID',
 )
 def get_user_detail(request, id: uuid.UUID):
-    return get_object_or_404(User, id=id) # Esse método é do Django, e retorna o usuário, se for encontrado, ou Erro 404 se não existir
+    try:
+        user = User.objects.get(id=id)
+    except User.DoesNotExist:
+        logger.warning(f'Attempt to retrieve non-existent user: {id}')
+        raise NotFoundError('User not found')
+    logger.info(f'User {user.username} (id={id}) retrieved by {request.auth}')
+    return user
+
+    # return get_object_or_404(User, id=id) # Esse método é do Django, e retorna o usuário, se for encontrado, ou Erro 404 se não existir
+
 
 @router.get(
     'users/username/{username}',
@@ -214,8 +223,30 @@ def get_user_detail(request, id: uuid.UUID):
     description='Retrieve user details by Username',
 )
 def get_user_detail_by_username(request, username: str):
-    return get_object_or_404(User, username=username)
+    try:
+        user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        logger.warning(f'Attempt to retrieve non-existent user: {username}')
+        raise NotFoundError('User not found')
+    logger.info(f'User {user.username} retrieved by {request.auth}')
+    return user
 ```
+
+!!! note
+
+    Como padronizamos os nossos erros da API nesse capítulo: [Erros Customizados](../01_setup_inicial/06_Padronizando_Erros.md), tivémos que fazer o try/except para pegar as exceções de Not Found e lançar um erro customizado. Senão, essas funções poderíam simplesmente usar o método `get_object_or_404()` do Django, por exemplo assim:
+    ```python
+    from django.shortcuts import get_object_or_404
+
+    @router.get(
+        'users/{id}',
+        response=UserSchemaWithGroups,
+        summary='Get user detail',
+        description='Retrieve user details by ID',
+    )
+    def get_user_detail(request, id: uuid.UUID):
+        return get_object_or_404(User, id=id)
+    ```
 
 E agora vamos criar um teste para esses endpoints:
 
@@ -259,7 +290,7 @@ def test_get_user_detail_by_username(client):
 
 ### Post
 
-Aqui é o mesmo esquema, vamos criar um Schema para o POST, e a rota do POST, e o teste de criação de usuário.
+O método `POST` será usado para fazer a criação de um novo usuário. Nesse caso, vamos criar um Schema para o POST (que será o Payload que esperamos receber na request); a rota do POST no arquivo `api.py`, e o teste de criação de usuário. Note que todos os usuários serão criados inicialmente com o status `is_active` como False, e o usuário precisará fazer a ativação da sua conta para poder fazer o login. Veremos isso mais pra frente, por enquanto vamos apenas criar um novo usuário na base.
 
 Para o Schema, vamos pedir como input da API apenas o usuário, nome, sobrenome, email e senha:
 
@@ -272,7 +303,7 @@ class UserCreateSchema(Schema):
     password: str = Field(..., example='strongpassword')
 ```
 
-Agora a API. Aqui vamos colocar uma lógica para ele já barrar usuários com username ou e-mail repetidos. E o retorno de sucesso da API vai ser um 201 CREATED ao invés de 200 OK.
+Agora a API. Aqui vamos colocar uma lógica para ele já barrar usuários com username ou e-mail repetidos. E o retorno de sucesso da API vai ser um `201 Created` ao invés de `200 OK`.
 
 ```python title="./myapi/users/api.py"
 from ninja.responses import Response
@@ -283,18 +314,15 @@ from .schemas import (
     UserCreateSchema,
 )
 
-@router.post(
-    'users',
-    response=UserWithGroupsSchema,
-    summary='Create user',
-    description='Create a new user',
-)
+@router.post('users', response=UserWithGroupsSchema, summary='Create user', description='Create a new user', auth=None)
 def create_users(request, data: UserCreateSchema):
     # Pre-create validation: check username and email uniqueness
     if User.objects.filter(username=data.username).exists():
-        return Response({'detail': 'Username or email already exist!'}, status=409)
+        logger.warning(f'Attempt to create user with existing username: {data.username}')
+        raise ConflictError('Username already exists')
     if User.objects.filter(email=data.email).exists():
-        return Response({'detail': 'Username or email already exist!'}, status=409)
+        logger.warning(f'Attempt to create user with existing email: {data.email}')
+        raise ConflictError('Email already exists')
 
     try:
         user = User.objects.create_user(
@@ -303,12 +331,13 @@ def create_users(request, data: UserCreateSchema):
             last_name=data.last_name,
             email=data.email,
             password=data.password,
+            is_active=False,
         )
-    except:
-        return Response({'detail': 'Unable to create user'}, status=500)
+    except Exception as e:
+        logger.error(f'Failed to create user: {e}')
+        raise ServiceError('An unknow Service error ocurred when creating an user.')
 
     return Response(UserWithGroupsSchema.from_orm(user), status=201)
-
 ```
 
 Agora vamos testar as situações de criar um novo usuário com sucesso, e de criar usuários repetidos esperando um erro:
@@ -328,6 +357,7 @@ def test_create_users_success(client):
 
     assert response.status_code == HTTPStatus.CREATED
     assert response_json['username'] == user_payload['username']
+    assert not response_json['is_active']
 
 
 @pytest.mark.django_db
@@ -362,15 +392,23 @@ O Delete não recebe nenhum payload, então não precisamos criar nenhum Schema 
 
 ```python title="./myapi/users/api.py"
 @router.delete(
-    'users/{id}',
-    summary='Delete user',
-    response={204: None},
-    description='Delete an user',
+    'users/{id}', summary='Delete user', response={204: None}, description='Delete an user', auth=OwnerOrAdminAuth()
 )
 def delete_user(request, id: uuid.UUID):
-    user = get_object_or_404(User, id=id)
-    user.delete()
-    return Response(None, status=204)
+    # user = get_object_or_404(User, id=id)
+    try:
+        user = User.objects.get(id=id)
+    except User.DoesNotExist:
+        logger.warning(f'Attempt to delete non-existent user: {id}')
+        raise NotFoundError('User not found')
+
+    try:
+        logger.info(f'User {user.username} (id={id}) deleted by {request.auth}')
+        user.delete()
+        return Response(None, status=204)
+    except Exception as e:
+        logger.error(f'Failed to delete user: {e}')
+        raise ServiceError('An unknow Service error ocurred when deleting an user.')
 ```
 
 Agora vamos testar
@@ -415,28 +453,52 @@ from .schemas import (
     UserPatchSchema,
 )
 
+
 @router.patch(
     'users/{id}',
-    response=UserWithGroupSchema,
+    response=UserWithGroupsSchema,
     summary='Update user partially',
     description='Update only specified user fields',
+    auth=OwnerOrAdminAuth(),
 )
 def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
-    user = get_object_or_404(User, id=id)
+    try:
+        user = User.objects.get(id=id)
+    except User.DoesNotExist:
+        logger.warning(f'Attempt to update non-existent user: {id}')
+        raise NotFoundError('User not found')
 
-    for field, value in payload.dict(exclude_unset=True).items():
+    updated_fields = payload.dict(exclude_unset=True)
+    for field, value in updated_fields.items():
         setattr(user, field, value)
 
-    user.save()
-    return Response(UserWithGroupSchema.from_orm(user), status=200)
+    try:
+        user.save()
+        logger.info(
+            f'User {user.username} (id={id}) updated by {request.auth} - fields: {list(updated_fields.keys())}'
+        )
+        return Response(UserWithGroupsSchema.from_orm(user), status=200)
+    except Exception as e:
+        logger.error(f'Failed to update user: {e}')
+        raise ServiceError('An unknow Service error ocurred when updating an user.')
 ```
 
 E agora o teste:
 
 ```python title="./myapi/users/tests/test_users.py"
-@pytest.mark.django_db
-def test_patch_user(client):
-    response = create_user()
+ef test_patch_user(client):
+    user_payload = {
+        'username': 'admin_new',
+        'first_name': 'New',
+        'last_name': 'Admin',
+        'email': 'admin_new@admin.com',
+        'password': 'myadminpassword',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
     user_id = response.json()['id']
 
     patch_data = {
@@ -444,19 +506,22 @@ def test_patch_user(client):
         'email': 'newemail@admin.com',
     }
 
-    response = client.patch(f'/api/v1/users/{user_id}', data=json.dumps(patch_data), content_type='application/json')
+    response = client.patch(
+        f'/api/v1/users/{user_id}',
+        data=json.dumps(patch_data),
+        content_type='application/json',
+    )
 
     response_json = response.json()
     assert response.status_code == HTTPStatus.OK
     assert response_json['first_name'] == 'NewName'
     assert response_json['email'] == 'newemail@admin.com'
-
 ```
-
 
 ## Implementando filtros na rota
 
-Vamos melhorar um pouco a busca de usuários, implementando filtros na rota de GET
+Vamos melhorar um pouco a busca de usuários, implementando filtros na rota de GET. Já temos a rota de GET `/users` criada com a função list_users, mas vamos melhorar um pouco ela permitindo que ela receba os parâmetros id e username, assim:
+`http://localhost:3000/users?id=xxxxx` ou `http://localhost:3000/users?username=xxxxx`:
 
 ```python title="./myapi/users/api.py"
 @router.get(
@@ -470,12 +535,22 @@ def list_users(request, id: uuid.UUID = None, username: str = None):
     queryset = User.objects.all()
 
     if id:
-        user = get_object_or_404(User, id=id)
-        return [user]
+        try:
+            user = User.objects.get(id=id)
+            logger.info(f'User retrieved by id={id} by {request.auth}')
+            return [user]
+        except User.DoesNotExist:
+            logger.warning(f'Attempt to retrieve non-existent user: id={id}')
+            raise NotFoundError('User not found')
 
     if username:
-        user = get_object_or_404(User, username=username)
-        return [user]
+        try:
+            user = User.objects.get(username=username)
+            logger.info(f'User retrieved by username={username} by {request.auth}')
+            return [user]
+        except User.DoesNotExist:
+            logger.warning(f'Attempt to retrieve non-existent user: username={username}')
+            raise NotFoundError('User not found')
 
     logger.info(f'All users retrieved by {request.auth}')
     return queryset
@@ -507,4 +582,4 @@ def test_list_users_filter_by_username(client):
 
 !!! success
 
-    Temos agora uma nova app chamada `users`, que faz um CRUD básico na tabela de usuários, e no GET podemos inclusive passar alguns filtros, como o username por exemplo. Mas ainda não temos nada de autenticação e autorização implementado, qualquer usuário anônimo pode mexer a vontade no sistema. Vamos arrumar isso a seguir!
+    Temos agora uma nova app chamada `users`, que faz um CRUD básico na tabela de usuários, e no GET podemos inclusive passar alguns filtros, como o username por exemplo. Mas ainda não temos nada de ativação de contas, autenticação e autorização implementado, qualquer usuário anônimo pode mexer a vontade no sistema. Vamos arrumar isso a seguir!

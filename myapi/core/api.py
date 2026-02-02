@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from http import HTTPStatus
 
@@ -62,4 +63,4 @@ def login(request, username: str = Form(...), password: str = Form(...)):
         raise UnauthorizedError()
     logger.info(f'User {user.username} (id={user.id}) logged in')
     tokens = create_token(user)
-    return 200, {'access_token': tokens.get('access_token') or tokens.get('access'), 'token_type': 'bearer', **tokens}
+    return 200, {'token_type': 'bearer', **tokens}
