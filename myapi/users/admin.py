@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import UUIDUser
+from .models import ActivationToken, UUIDUser
 
 
 # Register custom User with full Django Admin interface
@@ -23,3 +23,12 @@ class MyUserAdmin(UserAdmin):
 
     # Read-only fields
     readonly_fields = ('id', 'date_joined', 'last_login')
+
+
+@admin.register(ActivationToken)
+class ActivationTokenAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'is_expired', 'is_used', 'created_at', 'expires_at')
+    list_filter = ('created_at', 'expires_at', 'used_at')
+    search_fields = ('user__username', 'user__email')
+    readonly_fields = ('id', 'user', 'created_at', 'updated_at')
+    ordering = ('-created_at',)

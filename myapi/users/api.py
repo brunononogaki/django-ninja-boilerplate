@@ -7,12 +7,13 @@ from ninja.pagination import paginate
 from ninja.responses import Response
 
 from ..core.auth import AdminAuth, OwnerOrAdminAuth
-from ..core.exceptions import ConflictError, NotFoundError, ValidationError
+from ..core.exceptions import ConflictError, NotFoundError, ServiceError, ValidationError
 from .schemas import (
     UserCreateSchema,
     UserPatchSchema,
     UserWithGroupsSchema,
 )
+from .services import send_activation_email, verify_activation_token
 
 router = Router(tags=['Users'])
 
@@ -99,14 +100,25 @@ def create_users(request, data: UserCreateSchema):
         logger.warning(f'Attempt to create user with existing email: {data.email}')
         raise ConflictError('Email already exists')
 
-    user = User.objects.create_user(
-        username=data.username,
-        first_name=data.first_name,
-        last_name=data.last_name,
-        email=data.email,
-        password=data.password,
-        is_active=False,
-    )
+    try:
+        user = User.objects.create_user(
+            username=data.username,
+            first_name=data.first_name,
+            last_name=data.last_name,
+            email=data.email,
+            password=data.password,
+            is_active=False,
+        )
+    except Exception as e:
+        logger.error(f'Failed to create user: {e}')
+        raise ServiceError('An unknow Service error ocurred when creating an user.')
+
+    # Send activation email
+    try:
+        send_activation_email(user)
+        logger.info(f'Activation email sent to {user.email}')
+    except Exception as e:
+        logger.error(f'Failed to send activation email to {user.email}: {e}')
 
     logger.info(f'User {user.username} (id={user.id}) created')
     return Response(UserWithGroupsSchema.from_orm(user), status=201)
@@ -123,9 +135,13 @@ def delete_user(request, id: uuid.UUID):
         logger.warning(f'Attempt to delete non-existent user: {id}')
         raise NotFoundError('User not found')
 
-    logger.info(f'User {user.username} (id={id}) deleted by {request.auth}')
-    user.delete()
-    return Response(None, status=204)
+    try:
+        logger.info(f'User {user.username} (id={id}) deleted by {request.auth}')
+        user.delete()
+        return Response(None, status=204)
+    except Exception as e:
+        logger.error(f'Failed to delete user: {e}')
+        raise ServiceError('An unknow Service error ocurred when deleting an user.')
 
 
 @router.patch(
@@ -142,10 +158,35 @@ def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
         logger.warning(f'Attempt to update non-existent user: {id}')
         raise NotFoundError('User not found')
 
+    # Create a dict based on the schema UserPatchSchema, but removing fields that were not in the payload
     updated_fields = payload.dict(exclude_unset=True)
     for field, value in updated_fields.items():
         setattr(user, field, value)
 
-    user.save()
-    logger.info(f'User {user.username} (id={id}) updated by {request.auth} - fields: {list(updated_fields.keys())}')
+    try:
+        user.save()
+        logger.info(
+            f'User {user.username} (id={id}) updated by {request.auth} - fields: {list(updated_fields.keys())}'
+        )
+        return Response(UserWithGroupsSchema.from_orm(user), status=200)
+    except Exception as e:
+        logger.error(f'Failed to update user: {e}')
+        raise ServiceError('An unknow Service error ocurred when updating an user.')
+
+
+@router.patch(
+    'users/activate/{token_id}',
+    response=UserWithGroupsSchema,
+    summary='Activate user account',
+    description='Activate user account using activation token',
+    auth=None,
+)
+def activate_user(request, token_id: uuid.UUID):
+    user = verify_activation_token(str(token_id))
+
+    if user is None:
+        logger.warning(f'Attempt to activate with invalid token: token_id={token_id}')
+        raise ValidationError('Invalid or expired activation token')
+
+    logger.info(f'User {user.username} activated')
     return Response(UserWithGroupsSchema.from_orm(user), status=200)

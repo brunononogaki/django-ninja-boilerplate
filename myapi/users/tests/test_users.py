@@ -1,9 +1,17 @@
 import json
+import re
+import uuid
+from datetime import timedelta
 from http import HTTPStatus
 
 import pytest
 from decouple import config
 from django.contrib.auth import get_user_model
+from django.core import mail
+from django.utils import timezone
+from freezegun import freeze_time
+
+from myapi.users.models import ActivationToken
 
 
 @pytest.fixture
@@ -153,6 +161,9 @@ def test_get_user_detail_user_to_other_user_fail(client, create_non_admin_access
 
 @pytest.mark.django_db
 def test_create_users_success(client):
+    # Clear outbox
+    mail.outbox = []
+
     user_payload = {
         'username': 'admin_new',
         'first_name': 'New',
@@ -169,24 +180,15 @@ def test_create_users_success(client):
 
     assert response.status_code == HTTPStatus.CREATED
     assert response_json['username'] == user_payload['username']
+    assert response_json['is_active'] == False
 
-
-# @pytest.mark.django_db
-# def test_create_users_unauthorized(client, create_non_admin_access_token):
-#     user_payload = {
-#         'username': 'admin_new',
-#         'first_name': 'New',
-#         'last_name': 'Admin',
-#         'email': 'admin_new@admin.com',
-#         'password': 'myadminpassword',
-#     }
-#     response = client.post(
-#         '/api/v1/users',
-#         data=json.dumps(user_payload),
-#         content_type='application/json',
-#         HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
-#     )
-#     assert response.status_code == HTTPStatus.UNAUTHORIZED
+    # Assert activation email was sent
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+    assert email.subject == 'Ative sua conta'
+    assert 'admin_new@admin.com' in email.to
+    assert 'New' in email.body
+    assert '/activate/' in email.body
 
 
 @pytest.mark.django_db
@@ -368,3 +370,149 @@ def test_patch_user_to_other_user_fail(client, create_non_admin_access_token):
         HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
     )
     assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.django_db
+def test_activate_user_success(client):
+    """Test successful user account activation"""
+    # Create a user
+    user_payload = {
+        'username': 'activate_test',
+        'first_name': 'Activate',
+        'last_name': 'Test',
+        'email': 'activate@test.com',
+        'password': 'testpassword',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    user_created = response.json()
+
+    # User should be inactive
+    assert user_created['is_active'] is False
+
+    # Get the activation token from email
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+    match = re.search(r'/activate/([0-9a-fA-F-]{36})', email.body)
+    activation_token_from_email = match.group(1) if match else None
+    assert activation_token_from_email is not None, 'Activation token not found in email body'
+
+    # Activate the user
+    response = client.patch(
+        f'/api/v1/users/activate/{activation_token_from_email}',
+    )
+    user_activated = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert user_activated['username'] == 'activate_test'
+    assert user_activated['is_active'] is True
+
+    # Check that token is marked as used
+    activation_token = ActivationToken.objects.get(id=activation_token_from_email)
+    assert activation_token.used_at is not None
+
+
+@pytest.mark.django_db
+def test_activate_user_invalid_token(client):
+    """Test activation with invalid token"""
+    # Try to activate with non-existent IDs
+    token_id = uuid.uuid4()
+
+    response = client.patch(f'/api/v1/users/activate/{token_id}')
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_activate_user_already_used_token(client):
+    """Test successful user account activation"""
+    # Create a user
+    user_payload = {
+        'username': 'activate_test',
+        'first_name': 'Activate',
+        'last_name': 'Test',
+        'email': 'activate@test.com',
+        'password': 'testpassword',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    user_created = response.json()
+
+    # User should be inactive
+    assert user_created['is_active'] is False
+
+    # Get the activation token from email
+    assert len(mail.outbox) == 1
+    email = mail.outbox[0]
+    match = re.search(r'/activate/([0-9a-fA-F-]{36})', email.body)
+    activation_token_from_email = match.group(1) if match else None
+    assert activation_token_from_email is not None, 'Activation token not found in email body'
+
+    # Activate the user
+    response = client.patch(
+        f'/api/v1/users/activate/{activation_token_from_email}',
+    )
+    user_activated = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert user_activated['username'] == 'activate_test'
+    assert user_activated['is_active'] is True
+
+    # Check that token is marked as used
+    activation_token = ActivationToken.objects.get(id=activation_token_from_email)
+    assert activation_token.used_at is not None
+
+    # Activate the user again
+    response = client.patch(
+        f'/api/v1/users/activate/{activation_token_from_email}',
+    )
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_activate_user_expired_token(client):
+    """Test activation with expired token"""
+
+    # Get current time
+    now = timezone.now()
+
+    # Create user at current time
+    with freeze_time(now):
+        user_payload = {
+            'username': 'expire_test',
+            'first_name': 'Expire',
+            'last_name': 'Test',
+            'email': 'expire@test.com',
+            'password': 'testpassword',
+        }
+        response = client.post(
+            '/api/v1/users',
+            data=json.dumps(user_payload),
+            content_type='application/json',
+        )
+        user_id = response.json()['id']
+
+        # Get the activation token
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        activation_token = ActivationToken.objects.get(user=user)
+
+    # Move 16 minutes to the future
+    with freeze_time(now + timedelta(minutes=16)):
+        # Try to activate with expired token
+        response = client.patch(
+            f'/api/v1/users/activate/{activation_token.id}',
+            content_type='application/json',
+        )
+
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+
+        # User should still be inactive
+        user.refresh_from_db()
+        assert user.is_active is False
