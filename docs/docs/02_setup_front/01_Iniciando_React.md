@@ -335,12 +335,81 @@ Esse comando vai gerar automaticamente os seguintes arquivos:
 - postcss.config.js
 - tailwind.config.js
 
-## Configurando imports no Next.JS
-O next tem a capacidade nativa de fazer os imports apontando diretamente o caminho do arquivo, sem ter que fazer aquele import relativo usando `../` ou `../../xxxx`. Para isso, basta criar um arquivo chamado `jsconfig.json` dentro da pasta do next com o seguinte conteúdo:
+No arquivo `tailwind.config.js`, adicione as pastas do projeto na lista de content:
 
-```json
-{
-  "compilerOptions": {
-    "baseUrl": ".",
+```javascript title="./next/tailwind.config.js" hl_lines="3-7"
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
 }
 ```
+
+Vamos criar um arquivo chamado `globals.css` dentro de uma pasta chamada styles, com esse conteúdo:
+
+```css ./next/styles/globals.css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+E depois criar um arquivo `_app.js` na raíz do diretório `pages` com isso:
+
+```javascript title="./next/pages/_app.js"
+import 'styles/globals.css';
+
+export default function App({ Component, pageProps }) {
+  return <Component {...pageProps} />;
+}
+```
+
+!!! tip
+
+    O next tem a capacidade nativa de fazer os imports apontando diretamente o caminho do arquivo, sem ter que fazer aquele import relativo usando `../` ou `../../xxxx`. Por esse motivo fizemos o import do css apenas com 'styles/globals.css'. Para isso funcionar, basta criar um arquivo chamado `jsconfig.json` dentro da pasta do next com o seguinte conteúdo:
+
+    ```json
+    {
+      "compilerOptions": {
+        "baseUrl": ".",
+    }
+```
+
+## Criando uma Home de teste
+
+Agora vamos criar uma pagininha de Home bem simples, apenas para testar se o Tailwind está funcionando. No arquivo `index.js` da raíz do diretório `pages`, altere todo o conteúdo para isso:
+
+```javascript title="./next/pages/index.js"
+export default function Home() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full text-center">
+        <h1 className="text-4xl font-bold text-gray-900 mb-2">Django Ninja</h1>
+        <p className="text-gray-600 mb-8 text-lg">API Boilerplate</p>
+        
+        <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg mb-4">
+          Entrar
+        </button>
+        
+        <button className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg">
+          Criar Conta
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+!!! success
+
+    Agora ao abrir a página `http://localhost:3000`, você deverá ver uma página assim:
+    ![alt text](static/new-home.png)
+
+    Claro que ainda vamos evoluir bastate, é só para testar se o Tailwind está funcional!
+
