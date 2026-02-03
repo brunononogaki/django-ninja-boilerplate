@@ -17,7 +17,7 @@ nav:
     - 01. Fazendo o CRUD de Users: 03_usuarios_autenticacao/01_CRUD_de_Users.md   
     - 02. Implementando a ativação de contas: 03_usuarios_autenticacao/02_Ativacao_de_contas.md
     - 03. Implementando autenticação e autorização: 03_usuarios_autenticacao/03_Autenticacao_e_Autorizacao.md
-
+    - 04. Integrando Gmail para envio de e-mails: 03_usuarios_autenticacao/04_Integrando_Gmail_Emails.md
   - Apêndice:
     - 01. Configurando o Traefik: Appendix/01_Configurando_o_Traefik.md    
 theme:
