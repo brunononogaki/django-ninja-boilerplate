@@ -222,7 +222,7 @@ expires_at = timezone.now() + timedelta(minutes=token_expiry_minutes)
 
 Para gerar o link, precisaremos também do endereço do servidor, que será `http://localhost:3000` no ambiente de dev, ou `https://dominio.com` no ambiente de prod. Podemos controlar isso através da variável de ambiente `FRONTEND_FQDN`, que já temos definido no nosso `.env`.
 
-Agora basta adicionarmos isso tudo na função `send_activation_token`, assim:
+Agora basta adicionarmos isso tudo na função `send_activation_token`. Vamos aproveitar e formatar um e-mail mais bonito em HTML.
 
 ```python title="./myapi/users/services.py" hl_lines="9-10 12-14 16-21 23-24 32"
 def send_activation_email(user, token_expiry_minutes=15):
@@ -250,18 +250,54 @@ def send_activation_email(user, token_expiry_minutes=15):
     # Build activation URL using the token id
     activation_url = f'{protocol}://{frontend_fqdn}/activate/{activation_token.id}'
 
+    # Prepare email with HTML formatting
+    html_body = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto;">
+                <h2>Bem-vindo!</h2>
+                <p>Olá <strong>{user.first_name or user.username}</strong>,</p>
+                
+                <p>Clique no link abaixo para ativar sua conta:</p>
+                
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{activation_url}" style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        Ativar Conta
+                    </a>
+                </p>
+                
+                <p style="font-size: 14px; color: #666;">
+                    Ou copie este link no seu navegador:<br>
+                    <code style="background-color: #f4f4f4; padding: 5px; border-radius: 3px; word-break: break-all;">
+                        {activation_url}
+                    </code>
+                </p>
+                
+                <p style="font-size: 12px; color: #999;">
+                    Este link expira em <strong>{token_expiry_minutes} minutos</strong>.
+                </p>
+                
+                <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+                
+                <p style="font-size: 12px; color: #999;">
+                    Se você não criou essa conta, ignore este email.
+                </p>
+                
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+                    <p style="font-size: 12px; color: #666; margin: 5px 0;">
+                        <strong>Equipe Django Ninja API Boilerplate</strong><br>
+                        Email: <a href="mailto:djangoninja.api@gmail.com" style="color: #007bff; text-decoration: none;">djangoninja.api@gmail.com</a>
+                    </p>
+                </div>
+            </div>
+        </body>
+    </html>
+    """
+
     # Prepare email
     mail_options = {
         'subject': 'Ative sua conta',
-        'body': f"""Olá {user.first_name or user.username},
-
-Clique no link abaixo para ativar sua conta:
-{activation_url}
-
-Este link expira em {token_expiry_minutes} minutos.
-
-Se você não criou essa conta, ignore este email.
-""",
+        'body': html_body,
         'from': 'contato@myapi.com',
         'to': [user.email],
     }
