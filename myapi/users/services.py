@@ -44,32 +44,25 @@ def send_activation_email(user, token_expiry_minutes=15):
             <div style="max-width: 600px; margin: 0 auto;">
                 <h2>Bem-vindo!</h2>
                 <p>Olá <strong>{user.first_name or user.username}</strong>,</p>
-                
                 <p>Clique no link abaixo para ativar sua conta:</p>
-                
                 <p style="text-align: center; margin: 30px 0;">
                     <a href="{activation_url}" style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
                         Ativar Conta
                     </a>
                 </p>
-                
                 <p style="font-size: 14px; color: #666;">
                     Ou copie este link no seu navegador:<br>
                     <code style="background-color: #f4f4f4; padding: 5px; border-radius: 3px; word-break: break-all;">
                         {activation_url}
                     </code>
                 </p>
-                
                 <p style="font-size: 12px; color: #999;">
                     Este link expira em <strong>{token_expiry_minutes} minutos</strong>.
                 </p>
-                
                 <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-                
                 <p style="font-size: 12px; color: #999;">
                     Se você não criou essa conta, ignore este email.
                 </p>
-                
                 <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
                     <p style="font-size: 12px; color: #666; margin: 5px 0;">
                         <strong>Equipe Django Ninja API Boilerplate</strong><br>
