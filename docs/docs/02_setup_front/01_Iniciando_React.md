@@ -25,6 +25,7 @@ lts/iron
 E agora para usar essa versão, basta dar o comando:
 
 ```bash
+nvm install lts/iron
 nvm use
 
 Now using node v20.19.6 (npm v10.8.2)
@@ -315,3 +316,31 @@ exit 1
 !!! success
 
     Feito! Agora o nosso front-end está disponível na produção, em https://react.brunononogaki.com
+
+## Instalando o TailwindCSS
+
+Vamos utilizar o `TailwindCSS` na versão 3 para estilizar a nossa página, então já vamos deixar essa,dependência instalada no `next`, como uma dependência de DEV, porque o tailwind é usado no build, e não é necessário em runtime. Deixando apenas como dependência de DEV, diminuímos o tamanho do node_modules em produção, e o deploy fica mais leve!
+
+```bash
+cd next
+npm install -D tailwindcss@3 postcss autoprefixer
+```
+
+E agora vamos inicializar o Tailwind:
+```bash
+npx tailwindcss init -p
+```
+
+Esse comando vai gerar automaticamente os seguintes arquivos:
+- postcss.config.js
+- tailwind.config.js
+
+## Configurando imports no Next.JS
+O next tem a capacidade nativa de fazer os imports apontando diretamente o caminho do arquivo, sem ter que fazer aquele import relativo usando `../` ou `../../xxxx`. Para isso, basta criar um arquivo chamado `jsconfig.json` dentro da pasta do next com o seguinte conteúdo:
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+}
+```
