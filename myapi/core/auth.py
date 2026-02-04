@@ -9,7 +9,7 @@ from ninja.security import HttpBearer
 User = get_user_model()
 ALGO = 'HS256'
 ACCESS_LIFETIME = timedelta(minutes=15)
-REFRESH_LIFETIME = timedelta(days=7)
+REFRESH_LIFETIME = timedelta(days=30)
 
 
 def create_token(user):
@@ -25,6 +25,20 @@ def create_token(user):
         algorithm=ALGO,
     )
     return {'access_token': access_token, 'refresh_token': refresh_token}
+
+
+def verify_refresh_token(token):
+    """Verify refresh token and return the user"""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGO])
+        if payload.get('type') != 'refresh':
+            return None
+        user_id = payload.get('user_id')
+        return User.objects.get(id=user_id)
+    except jwt.ExpiredSignatureError:
+        return None
+    except Exception:
+        return None
 
 
 class JWTAuth(HttpBearer):

@@ -26,7 +26,7 @@ from ninja.security import HttpBearer
 User = get_user_model()
 ALGO = 'HS256'
 ACCESS_LIFETIME = timedelta(minutes=15)
-REFRESH_LIFETIME = timedelta(days=7)
+REFRESH_LIFETIME = timedelta(days=30)
 
 
 def create_token(user):
@@ -44,9 +44,14 @@ def create_token(user):
     return {'access_token': access_token, 'refresh_token': refresh_token}
 ```
 
-Agora precisamos criar a rota de geração de Token (`/login`). Mas antes, vamos criar o schema para o retorno dessa rota, e para esse cenário, esperamos receber um access_token, e um refresh_token, que poderá ser usado para renovar o access token antes de ele expirar.
+Agora precisamos criar a rota de geração de Token (`/login`). Mas antes, vamos criar os schemas para o recebimento e retorno dessa rota, e para esse cenário, esperamos receber um username e password, e retornar um access_token e um refresh_token, que poderá ser usado para renovar o access token antes de ele expirar.
 
 ```python title="./myapi/core/schemas.py"
+class LoginRequest(Schema):
+    username: str
+    password: str
+
+
 class TokenResponse(Schema):
     access_token: str
     refresh_token: str | None = None
@@ -65,10 +70,10 @@ from .schemas import (
 )
 
 @router.post('login', tags=['Auth'], response=TokenResponse)
-def login(request, username: str = Form(...), password: str = Form(...)):
-    user = authenticate(username=username, password=password)
+def login(request, credentials: LoginRequest):
+    user = authenticate(username=credentials.username, password=credentials.password)
     if not user:
-        logger.warning(f'Failed login attempt for username: {username}')
+        logger.warning(f'Failed login attempt for username: {credentials.username}')
         raise UnauthorizedError()
     logger.info(f'User {user.username} (id={user.id}) logged in')
     tokens = create_token(user)
@@ -78,6 +83,127 @@ def login(request, username: str = Form(...), password: str = Form(...)):
 !!! success
 
     Agora temos um novo endpoint `/login`, que é capaz de autenticar um usuário baseado no username e password, e caso a autenticação ocorra com sucesso, ele retorna um access token, que deverá ser usado no Header das futuras requisições, nesse formato: `Authorization: Bearer + <access_token>`
+
+## Refresh do Token
+
+De forma similar, podemos usar o Refresh Token para gerar um novo access token. Como o refresh token tem validade de 30 dias, cada vez que o usuário enviar um `POST` para o `/refresh`, validaremos se o refresh token está dentro da validade, e se estiver, ele retorna um novo access token. Futuramente no nosso front, precisaremos consumir essa informação para atualizar o token no local storage.
+
+Então vamos criar essa rota, quase idêntica à rota de login, com a diferença que ao invés de autenticarmos o usuário e senha, vamos validar o refresh token.
+
+Primeiro, criaremos o schema:
+
+```python title="./myapi/code/schemas.py"
+class RefreshRequest(Schema):
+    refresh_token: str
+```
+
+E agora a rota:
+
+```python title="./myapi/core/api.py"
+@router.post('refresh', tags=['Auth'], response=TokenResponse)
+def refresh(request, credentials: RefreshRequest):
+    """Refresh access token using a valid refresh token"""
+    user = verify_refresh_token(credentials.refresh_token)
+    if not user:
+        logger.warning(f'Failed refresh attempt with invalid refresh token')
+        raise UnauthorizedError(message='Invalid or expired refresh token')
+    logger.info(f'User {user.username} (id={user.id}) refreshed token')
+    tokens = create_token(user)
+    return 200, {'token_type': 'bearer', **tokens}
+```
+
+E no `auth.py` criamos a função `verify_refresh_token()`, também bastante similar ao método `authenticate()`.
+
+```python title="./myapi/core/auth.py"
+def verify_refresh_token(token):
+    """Verify refresh token and return the user"""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGO])
+        if payload.get('type') != 'refresh':
+            return None
+        user_id = payload.get('user_id')
+        return User.objects.get(id=user_id)
+    except jwt.ExpiredSignatureError:
+        return None
+    except Exception:
+        return None
+```
+
+Aí para testar isso, novamente vamos recorrer ao `freezegun`. Vamos simular a criação de um token, avançar 14 minutos, fazer um refresh, validar que recebemos um novo token, avançar mais 10 minutos e ver se ele continua válido. Vamos incluir esse teste no `test_auth.py`:
+
+```python title="./myapi/tests/test_auth.py"
+from freezegun import freeze_time
+
+@pytest.mark.django_db
+def test_refresh_token_success(client):
+    """Test refreshing access token before it expires"""
+    # Capture the initial time as reference
+    initial_time = timezone.now()
+
+    # Step 1: Login and get tokens
+    response = client.post(
+        '/api/v1/login',
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
+    )
+    data = response.json()
+    access_token_1 = data['access_token']
+    refresh_token = data['refresh_token']
+    assert response.status_code == HTTPStatus.OK
+
+    # Step 2: Advance 14 minutes (access token expires in 15)
+    with freeze_time(initial_time + timedelta(minutes=14)):
+        # Step 3: Call refresh endpoint
+        response = client.post(
+            '/api/v1/refresh',
+            data=json.dumps({'refresh_token': refresh_token}),
+            content_type='application/json',
+        )
+        data = response.json()
+        access_token_2 = data['access_token']
+
+        # Step 4: Verify we got a new token (different from the first)
+        assert response.status_code == HTTPStatus.OK
+        assert 'access_token' in data
+        assert access_token_1 != access_token_2  # Token deve ser diferente
+        assert data['token_type'] == 'bearer'
+
+        # Step 5: Advance more 10 minutes (total 24 minutes from start)
+        # Old access_token_1 should be expired, but access_token_2 should be valid
+        with freeze_time(initial_time + timedelta(minutes=24)):
+            # Try to use access_token_2 (should still work)
+            response = client.get(
+                '/api/v1/users',
+                HTTP_AUTHORIZATION=f'Bearer {access_token_2}',
+            )
+            # Should work because token_2 is fresh and only 10 minutes old
+            assert response.status_code == HTTPStatus.OK
+
+
+@pytest.mark.django_db
+def test_refresh_token_expired(client):
+    """Test that expired refresh tokens are rejected"""
+    # Login to get tokens
+    response = client.post(
+        '/api/v1/login',
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
+    )
+    data = response.json()
+    refresh_token = data['refresh_token']
+
+    # Advance 31 days (refresh token expires in 30)
+    with freeze_time(timezone.now() + timedelta(days=31)):
+        response = client.post(
+            '/api/v1/refresh',
+            data=json.dumps({'refresh_token': refresh_token}),
+            content_type='application/json',
+        )
+
+        # Should fail because refresh token is expired
+        assert response.status_code == HTTPStatus.UNAUTHORIZED
+        assert 'Invalid or expired refresh token' in response.json()['message']
+```
 
 ## Protegendo as rotas
 
@@ -157,7 +283,8 @@ User = get_user_model()
 def test_login_success(client):
     response = client.post(
         '/api/v1/login',
-        data={'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')},
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
     )
     data = response.json()
     assert response.status_code == HTTPStatus.OK
@@ -187,7 +314,8 @@ def test_login_inactive_user(client):
     # Try to login with inactive user
     response = client.post(
         '/api/v1/login',
-        data={'username': 'inactive_user', 'password': 'testpassword'},
+        data=json.dumps({'username': 'inactive_user', 'password': 'testpassword'}),
+        content_type='application/json',
     )
 
     # Should return 403 Forbidden
@@ -198,7 +326,8 @@ def test_login_inactive_user(client):
 def test_login_invalid_credentials(client):
     response = client.post(
         '/api/v1/login',
-        data={'username': config('DJANGO_ADMIN_USER'), 'password': 'wrongpassword'},
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': 'wrongpassword'}),
+        content_type='application/json',
     )
     data = response.json()
     assert response.status_code == HTTPStatus.UNAUTHORIZED
@@ -208,7 +337,8 @@ def test_login_invalid_credentials(client):
 def test_login_missing_fields(client):
     response = client.post(
         '/api/v1/login',
-        data={},
+        data=json.dumps({}),
+        content_type='application/json',
     )
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY or response.status_code == 422
 ```
@@ -220,7 +350,8 @@ Certo, mas esse teste é basicamente para ver se estamos conseguindo gerar o Tok
 def create_admin_access_token(client):
     response = client.post(
         '/api/v1/login',
-        data={'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')},
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
     )
     response_json = response.json()
     access_token = response_json['access_token']
@@ -342,7 +473,8 @@ def create_non_admin_access_token(client):
     # Get the auth token for the non-admin user
     response = client.post(
         '/api/v1/login',
-        data={'username': 'new_user_non_admin', 'password': 'myuserpassword'},
+        data=json.dumps({'username': 'new_user_non_admin', 'password': 'myuserpassword'}),
+        content_type='application/json',
     )
     response_json = response.json()
     access_token = response_json['access_token']
@@ -537,6 +669,62 @@ def test_patch_user_to_other_user_fail(client, create_non_admin_access_token):
         HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
     )
     assert response.status_code == HTTPStatus.UNAUTHORIZED
+```
+
+## Criando o endpoint `/me`
+
+O endpoint `/me` será usado para pegar os detalhes do próprio usuário que está logado, e isso com JWT é muito fácil, porque o Token já tem esse dado encodado na string. Se chamarmos o `JWTAuth()`, ele já faz a autenticação e retorna o usuário em `request.auth`. Com isso, já temos acesso ao usuário logado:
+
+```python title="./myapi/users/api.py"
+##############
+# Me (Current User)
+##############
+@router.get(
+    'me',
+    response=UserWithGroupsSchema,
+    summary='Get current user',
+    description='Get the current authenticated user information',
+    auth=JWTAuth(),
+)
+def get_current_user(request):
+    logger.info(f'User {request.auth.username} retrieved their profile')
+    return request.auth
+```
+
+Vamos adicionar esses testes:
+
+```python title="./muapi/users/test_users.py"
+##############
+# Me (Current User)
+##############
+@pytest.mark.django_db
+def test_get_current_user_admin(client, create_admin_access_token):
+    """Test that admin can get their own profile"""
+    response = client.get(
+        '/api/v1/me',
+        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
+    )
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert data['username'] == config('DJANGO_ADMIN_USER')
+    assert 'email' in data
+    assert 'id' in data
+
+
+@pytest.mark.django_db
+def test_get_current_user_non_admin(client, create_non_admin_access_token):
+    """Test that non-admin user can get their own profile"""
+    response = client.get(
+        '/api/v1/me',
+        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
+    )
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert data['username'] == 'new_user_non_admin'
+    assert data['email'] == 'user_new@admin.com'
+    assert 'id' in data
 ```
 
 !!! success
