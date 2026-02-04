@@ -319,7 +319,7 @@ exit 1
 
 ## Instalando o TailwindCSS
 
-Vamos utilizar o `TailwindCSS` na versão 3 para estilizar a nossa página, então já vamos deixar essa,dependência instalada no `next`, como uma dependência de DEV, porque o tailwind é usado no build, e não é necessário em runtime. Deixando apenas como dependência de DEV, diminuímos o tamanho do node_modules em produção, e o deploy fica mais leve!
+Vamos utilizar o `TailwindCSS` na versão 3 para estilizar a nossa página, então já vamos deixar essa dependência instalada no `next`, como uma dependência de DEV, porque o tailwind é usado no build, e não é necessário em runtime. Deixando apenas como dependência de DEV, diminuímos o tamanho do `node_modules` em produção, e o deploy fica mais leve!
 
 ```bash
 cd next
@@ -332,18 +332,18 @@ npx tailwindcss init -p
 ```
 
 Esse comando vai gerar automaticamente os seguintes arquivos:
-- postcss.config.js
-- tailwind.config.js
 
-No arquivo `tailwind.config.js`, adicione as pastas do projeto na lista de content:
+* postcss.config.js
+* tailwind.config.js
 
-```javascript title="./next/tailwind.config.js" hl_lines="3-7"
+No arquivo `tailwind.config.js`, adicione as pastas do projeto na lista de content. Por enquanto vamos adicionar somente as pastas de `pages` e `components`. Se tivermos outras pastas depois com arquivos `.jsx`, basta adicionar na lista:
+
+```javascript title="./next/tailwind.config.js" hl_lines="3-6"
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {},
@@ -354,7 +354,7 @@ module.exports = {
 
 Vamos criar um arquivo chamado `globals.css` dentro de uma pasta chamada styles, com esse conteúdo:
 
-```css ./next/styles/globals.css
+```css title="./next/styles/globals.css"
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -370,6 +370,8 @@ export default function App({ Component, pageProps }) {
 }
 ```
 
+O arquivo `_app.js` é um arquivo especial no Next.js. Ele é o componente raiz/wrapper de toda a aplicação, e é aqui que a gente importa o `globals.css`.
+
 !!! tip
 
     O next tem a capacidade nativa de fazer os imports apontando diretamente o caminho do arquivo, sem ter que fazer aquele import relativo usando `../` ou `../../xxxx`. Por esse motivo fizemos o import do css apenas com 'styles/globals.css'. Para isso funcionar, basta criar um arquivo chamado `jsconfig.json` dentro da pasta do next com o seguinte conteúdo:
@@ -379,7 +381,7 @@ export default function App({ Component, pageProps }) {
       "compilerOptions": {
         "baseUrl": ".",
     }
-```
+    ```
 
 ## Criando uma Home de teste
 
