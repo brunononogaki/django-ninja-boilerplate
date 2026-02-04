@@ -38,6 +38,7 @@ services:
     restart: unless-stopped
     volumes:
       - ../:/app
+      - django_static:/app/staticfiles
     environment:
       - DJANGO_SETTINGS_MODULE=myapi.settings
     logging:
@@ -48,6 +49,7 @@ services:
 
 volumes:
   pgdata:
+  django_static:
 
 networks:
   my-network:
