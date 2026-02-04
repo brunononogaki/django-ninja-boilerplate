@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import { loginUser } from "utils/auth";
 
 export default function Home() {
@@ -96,6 +97,19 @@ export default function Home() {
             {isLoading ? "Entrando..." : "Entrar"}
           </button>
         </form>
+
+        {/* Link para Signup */}
+        <div className="mt-6 text-center">
+          <p className="text-gray-600 text-sm">
+            Não tem uma conta?{" "}
+            <Link
+              href="/registration"
+              className="text-blue-600 hover:text-blue-700 font-semibold underline"
+            >
+              Crie sua conta
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
