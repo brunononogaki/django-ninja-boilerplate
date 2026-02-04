@@ -14,8 +14,13 @@ RUN pip install --no-cache-dir poetry && poetry config virtualenvs.create false 
 # Copy the rest of the code
 COPY . .
 
+# Copy entrypoint script
+COPY infra/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Expose Uvicorn port
 EXPOSE 8000
 
-# Default command (can be overridden in docker-compose)
+# Default command (can be overridden em docker-compose)
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "myapi.asgi:application", "--host", "0.0.0.0", "--port", "8000"]
