@@ -226,16 +226,24 @@ export async function loginUser(username, password) {
  * @param {string} username - Nome de usuário
  * @param {string} email - Email do usuário
  * @param {string} password - Senha
+ * @param {string} firstName - Primeiro nome
+ * @param {string} lastName - Sobrenome
  * @returns {Promise} - Resposta com dados do usuário criado
  *
  * @example
- * const user = await signupUser('bruno', 'bruno@email.com', 'senha123');
- * // { id: '...', username: 'bruno', email: 'bruno@email.com' }
+ * const user = await signupUser('bruno', 'bruno@email.com', 'senha123', 'Bruno', 'Nonogaki');
+ * // { id: '...', username: 'bruno', email: 'bruno@email.com', first_name: 'Bruno', last_name: 'Nonogaki' }
  */
-export async function signupUser(username, email, password) {
-  const response = await apiCall(API_ENDPOINTS.AUTH.SIGNUP, {
+export async function signupUser(username, email, password, firstName, lastName) {
+  const response = await apiCall(API_ENDPOINTS.USERS.CREATE, {
     method: "POST",
-    body: JSON.stringify({ username, email, password }),
+    body: JSON.stringify({ 
+      username, 
+      email, 
+      password,
+      first_name: firstName,
+      last_name: lastName,
+    }),
   });
 
   return response;
