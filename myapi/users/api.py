@@ -6,7 +6,7 @@ from ninja import Router
 from ninja.pagination import paginate
 from ninja.responses import Response
 
-from ..core.auth import AdminAuth, OwnerOrAdminAuth
+from ..core.auth import AdminAuth, JWTAuth, OwnerOrAdminAuth
 from ..core.exceptions import ConflictError, NotFoundError, ServiceError, ValidationError
 from .schemas import (
     UserCreateSchema,
@@ -18,6 +18,21 @@ from .services import send_activation_email, verify_activation_token
 router = Router(tags=['Users'])
 
 User = get_user_model()
+
+
+##############
+# Me (Current User)
+##############
+@router.get(
+    'me',
+    response=UserWithGroupsSchema,
+    summary='Get current user',
+    description='Get the current authenticated user information',
+    auth=JWTAuth(),
+)
+def get_current_user(request):
+    logger.info(f'User {request.auth.username} retrieved their profile')
+    return request.auth
 
 
 ##############

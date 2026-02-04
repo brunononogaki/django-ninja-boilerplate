@@ -5,12 +5,14 @@ from http import HTTPStatus
 from django.contrib.auth import authenticate
 from django.db import connection
 from loguru import logger
-from ninja import Form, Router
+from ninja import Router
 
-from .auth import create_token
+from .auth import create_token, verify_refresh_token
 from .exceptions import ServiceError, UnauthorizedError
 from .schemas import (
     StatusSchema,
+    LoginRequest,
+    RefreshRequest,
     TokenResponse,
 )
 
@@ -56,11 +58,23 @@ def status(request):
 # AUTH
 ##############
 @router.post('login', tags=['Auth'], response=TokenResponse)
-def login(request, username: str = Form(...), password: str = Form(...)):
-    user = authenticate(username=username, password=password)
+def login(request, credentials: LoginRequest):
+    user = authenticate(username=credentials.username, password=credentials.password)
     if not user:
-        logger.warning(f'Failed login attempt for username: {username}')
+        logger.warning(f'Failed login attempt for username: {credentials.username}')
         raise UnauthorizedError()
     logger.info(f'User {user.username} (id={user.id}) logged in')
+    tokens = create_token(user)
+    return 200, {'token_type': 'bearer', **tokens}
+
+
+@router.post('refresh', tags=['Auth'], response=TokenResponse)
+def refresh(request, credentials: RefreshRequest):
+    """Refresh access token using a valid refresh token"""
+    user = verify_refresh_token(credentials.refresh_token)
+    if not user:
+        logger.warning(f'Failed refresh attempt with invalid refresh token')
+        raise UnauthorizedError(message='Invalid or expired refresh token')
+    logger.info(f'User {user.username} (id={user.id}) refreshed token')
     tokens = create_token(user)
     return 200, {'token_type': 'bearer', **tokens}

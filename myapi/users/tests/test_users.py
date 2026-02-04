@@ -18,7 +18,8 @@ from myapi.users.models import ActivationToken
 def create_admin_access_token(client):
     response = client.post(
         '/api/v1/login',
-        data={'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')},
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
     )
     response_json = response.json()
     access_token = response_json['access_token']
@@ -50,7 +51,8 @@ def create_non_admin_access_token(client):
     # Get the auth token for the non-admin user
     response = client.post(
         '/api/v1/login',
-        data={'username': 'new_user_non_admin', 'password': 'myuserpassword'},
+        data=json.dumps({'username': 'new_user_non_admin', 'password': 'myuserpassword'}),
+        content_type='application/json',
     )
     response_json = response.json()
     access_token = response_json['access_token']
@@ -516,3 +518,36 @@ def test_activate_user_expired_token(client):
         # User should still be inactive
         user.refresh_from_db()
         assert user.is_active is False
+
+
+##############
+# Me (Current User)
+##############
+@pytest.mark.django_db
+def test_get_current_user_admin(client, create_admin_access_token):
+    """Test that admin can get their own profile"""
+    response = client.get(
+        '/api/v1/me',
+        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
+    )
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert data['username'] == config('DJANGO_ADMIN_USER')
+    assert 'email' in data
+    assert 'id' in data
+
+
+@pytest.mark.django_db
+def test_get_current_user_non_admin(client, create_non_admin_access_token):
+    """Test that non-admin user can get their own profile"""
+    response = client.get(
+        '/api/v1/me',
+        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
+    )
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert data['username'] == 'new_user_non_admin'
+    assert data['email'] == 'user_new@admin.com'
+    assert 'id' in data
