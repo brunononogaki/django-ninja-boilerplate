@@ -10,9 +10,9 @@ from ninja import Router
 from .auth import create_token, verify_refresh_token
 from .exceptions import ServiceError, UnauthorizedError
 from .schemas import (
-    StatusSchema,
     LoginRequest,
     RefreshRequest,
+    StatusSchema,
     TokenResponse,
 )
 

@@ -8,12 +8,12 @@ from ninja.responses import Response
 
 from ..core.auth import AdminAuth, JWTAuth, OwnerOrAdminAuth
 from ..core.exceptions import ConflictError, NotFoundError, ServiceError, ValidationError
+from .models import ActivationToken
 from .schemas import (
     UserCreateSchema,
     UserPatchSchema,
     UserWithGroupsSchema,
 )
-from .models import ActivationToken
 from .services import send_activation_email, verify_activation_token
 
 router = Router(tags=['Users'])
