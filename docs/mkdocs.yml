@@ -21,7 +21,8 @@ nav:
   - Criando tela de login e cadastro:
       - 01. Preparando o Front: 04_frontend_login/01_Preparando_Front.md
       - 02. Criando a tela de login: 04_frontend_login/02_Tela_login.md
-      - 03. Criando a tela de cadastro: 04_frontend_login/03_Tela_cadastro.md  
+      - 03. Criando a tela de cadastro: 04_frontend_login/03_Tela_cadastro.md
+      - 04. Criando a tela de ativação: 04_frontend_login/04_Tela_ativacao.md
   - Apêndice:
       - 01. Configurando o Traefik: Appendix/01_Configurando_o_Traefik.md
 theme:
