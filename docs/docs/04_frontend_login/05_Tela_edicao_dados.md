@@ -209,7 +209,7 @@ export default function Home() {
 
 ## Alterando os dados do usuário
 
-Show, agora sim vamos criar um botão de submit para salvar esses dados. 
+Show, agora sim vamos criar um botão de submit para salvar esses dados.
 
 ### Criando o `utils/users.js`
 
@@ -341,6 +341,7 @@ export async function deleteUser(userId) {
   return response;
 }
 ```
+
 !!! note
 
     Veja que movi a função getCurrentUser para esse novo arquivo, removendo do `auth.js`, já que se trata de uma função do usuário, e não da autenticação.
@@ -350,10 +351,11 @@ export async function deleteUser(userId) {
 Agora basta criarmos uma função `handleSave` na nossa página, que vai invocar a função `updateUser`, que criamos lá no `utils/users.js`.
 
 ### Principais mudanças:
-- **[NEW]** State `isSaving` para controlar o estado de carregamento
-- **[NEW]** State `message` para exibir feedback de sucesso ou erro
-- **[NEW]** Função `handleSave()` que faz a chamada PATCH para atualizar os dados
-- **[NEW]** Feedback visual com mensagens de sucesso/erro com auto-dismiss
+
+- **\[NEW\]** State `isSaving` para controlar o estado de carregamento
+- **\[NEW\]** State `message` para exibir feedback de sucesso ou erro
+- **\[NEW\]** Função `handleSave()` que faz a chamada PATCH para atualizar os dados
+- **\[NEW\]** Feedback visual com mensagens de sucesso/erro com auto-dismiss
 
 ```javascript title="./next/pages/home.jsx" hl_lines="32-49"
 import { useEffect, useState } from "react";
@@ -366,8 +368,8 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false); // [NEW]
-  const [message, setMessage] = useState({ type: "", text: "" }); // [NEW]
+  const [isSaving, setIsSaving] = useState(false); // \[NEW\]
+  const [message, setMessage] = useState({ type: "", text: "" }); // \[NEW\]
   const [formData, setFormData] = useState({
     username: "",
     first_name: "",
@@ -439,7 +441,8 @@ export default function Home() {
     }));
   };
 
-  const handleSave = async () => { // [NEW]
+  const handleSave = async () => {
+    // \[NEW\]
     setIsSaving(true);
     setMessage({ type: "", text: "" });
 
@@ -615,17 +618,18 @@ export default function Home() {
 Para a alteração de senha, vamos criar mais 3 campos: dois para o usuário digitar uma senha nova, e um para digitar a senha atual. Para a interface ficar mais limpa, vamos criar um botão "Alterar Senha", que se clicado, vai setar a variável `isPasswordModalOpen` como True, e vai exibir um modal, que escreveremos em um componente chamado `ChangePasswordModal`. Futuramente, podemos até jogar esse modal em uma pasta de componentes reutilizáveis, mas por enquanto vamos deixar nessa página mesmo.
 
 ### Principais mudanças:
-- **[NEW]** Import de `changeUserPassword` do utils/users
-- **[NEW]** State `isPasswordModalOpen` para controlar a visibilidade do modal
-- **[NEW]** Handlers para o modal: `handlePasswordInputChange()`, `validatePasswordForm()`, `handlePasswordSubmit()`, `handleCloseModal()`
-- **[NEW]** Sub-componente `ChangePasswordModal` com lógica completa do formulário
-- **[NEW]** Botão "Alterar Senha" que abre o modal
+
+- **\[NEW\]** Import de `changeUserPassword` do utils/users
+- **\[NEW\]** State `isPasswordModalOpen` para controlar a visibilidade do modal
+- **\[NEW\]** Handlers para o modal: `handlePasswordInputChange()`, `validatePasswordForm()`, `handlePasswordSubmit()`, `handleCloseModal()`
+- **\[NEW\]** Sub-componente `ChangePasswordModal` com lógica completa do formulário
+- **\[NEW\]** Botão "Alterar Senha" que abre o modal
 
 ```javascript title="./next/pages/home.jsx" hl_lines="5,20,107-185,344-360"
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { getToken, logoutUser } from "utils/auth";
-import { getCurrentUser, updateUser, changeUserPassword } from "utils/users"; // [NEW] changeUserPassword
+import { getCurrentUser, updateUser, changeUserPassword } from "utils/users"; // \[NEW\] changeUserPassword
 
 export default function Home() {
   const router = useRouter();
