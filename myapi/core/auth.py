@@ -74,8 +74,12 @@ class OwnerOrAdminAuth(JWTAuth):
 
         target_identifier = None
         try:
-            # Pega o ID ou username do último segmento do path
-            target_identifier = str(request.path).split('/')[-1]
+            # Pega o ID ou username que vem após /users/
+            path_parts = str(request.path).split('/')
+            if 'users' in path_parts:
+                users_index = path_parts.index('users')
+                if users_index + 1 < len(path_parts):
+                    target_identifier = path_parts[users_index + 1]
         except Exception:
             target_identifier = None
 

@@ -17,12 +17,14 @@ nav:
       - 01. Fazendo o CRUD de Users: 03_usuarios_autenticacao/01_CRUD_de_Users.md
       - 02. Implementando a ativação de contas: 03_usuarios_autenticacao/02_Ativacao_de_contas.md
       - 03. Implementando autenticação e autorização: 03_usuarios_autenticacao/03_Autenticacao_e_Autorizacao.md
-      - 04. Integrando Gmail para envio de e-mails: 03_usuarios_autenticacao/04_Integrando_Gmail_Emails.md
+      - 04. Implementando a troca e reset de senha: 03_usuarios_autenticacao/04_Troca_e_Reset_Senha.md
+      - 05. Integrando Gmail para envio de e-mails: 03_usuarios_autenticacao/05_Integrando_Gmail_Emails.md
   - Criando tela de login e cadastro:
       - 01. Preparando o Front: 04_frontend_login/01_Preparando_Front.md
       - 02. Criando a tela de login: 04_frontend_login/02_Tela_login.md
       - 03. Criando a tela de cadastro: 04_frontend_login/03_Tela_cadastro.md
       - 04. Criando a tela de ativação: 04_frontend_login/04_Tela_ativacao.md
+      - 05. Criando a tela de edição de dados do usuário: 04_frontend_login/05_Tela_edicao_dados.md
   - Apêndice:
       - 01. Configurando o Traefik: Appendix/01_Configurando_o_Traefik.md
 theme:

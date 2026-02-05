@@ -214,22 +214,6 @@ def get_user_detail(request, id: uuid.UUID):
     return user
 
     # return get_object_or_404(User, id=id) # Esse método é do Django, e retorna o usuário, se for encontrado, ou Erro 404 se não existir
-
-
-@router.get(
-    'users/username/{username}',
-    response=UserWithGroupsSchema,
-    summary='Get user detail',
-    description='Retrieve user details by Username',
-)
-def get_user_detail_by_username(request, username: str):
-    try:
-        user = User.objects.get(username=username)
-    except User.DoesNotExist:
-        logger.warning(f'Attempt to retrieve non-existent user: {username}')
-        raise NotFoundError('User not found')
-    logger.info(f'User {user.username} retrieved by {request.auth}')
-    return user
 ```
 
 !!! note
@@ -271,17 +255,6 @@ def test_get_user_detail(client):
     User = get_user_model()
     admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
     response = client.get(f'/api/v1/users/{admin.id}')
-    data = response.json()
-
-    assert response.status_code == HTTPStatus.OK
-    assert data['username'] == config('DJANGO_ADMIN_USER')
-
-@pytest.mark.django_db
-def test_get_user_detail_by_username(client):
-    User = get_user_model()
-    admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
-
-    response = client.get(f'/api/v1/users/username/{admin.username}')
     data = response.json()
 
     assert response.status_code == HTTPStatus.OK

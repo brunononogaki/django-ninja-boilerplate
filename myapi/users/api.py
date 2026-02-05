@@ -12,6 +12,7 @@ from .models import ActivationToken
 from .schemas import (
     UserCreateSchema,
     UserPatchSchema,
+    UserPatchPasswordSchema,
     UserWithGroupsSchema,
 )
 from .services import send_activation_email, verify_activation_token
@@ -86,23 +87,6 @@ def get_user_detail_by_id(request, id: uuid.UUID):
         logger.warning(f'Attempt to retrieve non-existent user: {id}')
         raise NotFoundError('User not found')
     logger.info(f'User {user.username} (id={id}) retrieved by {request.auth}')
-    return user
-
-
-@router.get(
-    'users/username/{username}',
-    response=UserWithGroupsSchema,
-    summary='Get user detail',
-    description='Retrieve user details by Username',
-    auth=OwnerOrAdminAuth(),
-)
-def get_user_detail_by_username(request, username: str):
-    try:
-        user = User.objects.get(username=username)
-    except User.DoesNotExist:
-        logger.warning(f'Attempt to retrieve non-existent user: {username}')
-        raise NotFoundError('User not found')
-    logger.info(f'User {user.username} retrieved by {request.auth}')
     return user
 
 
@@ -188,6 +172,37 @@ def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
     except Exception as e:
         logger.error(f'Failed to update user: {e}')
         raise ServiceError('An unknow Service error ocurred when updating an user.')
+
+
+@router.patch(
+    'users/{id}/change-password',
+    response=UserWithGroupsSchema,
+    summary='Update user password',
+    description='Update password with current password verification',
+    auth=OwnerOrAdminAuth(),
+)
+def patch_user_password(request, id: uuid.UUID, payload: UserPatchPasswordSchema):
+    try:
+        user = User.objects.get(id=id)
+    except User.DoesNotExist:
+        logger.warning(f'Attempt to update non-existent user: {id}')
+        raise NotFoundError('User not found')
+
+    # Validate current password
+    if not user.check_password(payload.current_password):
+        logger.warning(f'Failed password change attempt for user {user.username} - wrong current password')
+        raise ValidationError('Current password is incorrect.')
+
+    # Set new password (this hashes it properly)
+    user.set_password(payload.new_password)
+
+    try:
+        user.save()
+        logger.info(f'User {user.username} (id={id}) changed password')
+        return Response(UserWithGroupsSchema.from_orm(user), status=200)
+    except Exception as e:
+        logger.error(f'Failed to update password for user {user.username}: {e}')
+        raise ServiceError('Failed to change password. Please try again later.')
 
 
 @router.patch(
