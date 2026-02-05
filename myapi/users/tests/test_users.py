@@ -520,9 +520,236 @@ def test_activate_user_expired_token(client):
         assert user.is_active is False
 
 
-##############
-# Me (Current User)
-##############
+@pytest.mark.django_db
+def test_resend_activation_success(client):
+    """Test successful resend of activation token with expired token"""
+    # Clear outbox
+    mail.outbox = []
+
+    # Get current time
+    now = timezone.now()
+
+    # Create user at current time
+    with freeze_time(now):
+        user_payload = {
+            'username': 'resend_test',
+            'first_name': 'Resend',
+            'last_name': 'Test',
+            'email': 'resend@test.com',
+            'password': 'testpassword',
+        }
+        response = client.post(
+            '/api/v1/users',
+            data=json.dumps(user_payload),
+            content_type='application/json',
+        )
+        user_id = response.json()['id']
+
+        # Get the activation token
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        old_activation_token = ActivationToken.objects.get(user=user)
+        old_token_id = str(old_activation_token.id)
+
+        # Clear outbox to get only the resend email
+        mail.outbox = []
+
+    # Move 16 minutes to the future (token expired)
+    with freeze_time(now + timedelta(minutes=16)):
+        # Try to activate with expired token - should fail
+        response = client.patch(
+            f'/api/v1/users/activate/{old_token_id}',
+            content_type='application/json',
+        )
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+
+        # Request a new activation token
+        response = client.post(
+            f'/api/v1/users/resend-activation/{old_token_id}',
+            content_type='application/json',
+        )
+        response_json = response.json()
+
+        assert response.status_code == HTTPStatus.OK
+        assert response_json['username'] == 'resend_test'
+        assert response_json['is_active'] is False
+
+        # Check that a new activation email was sent
+        assert len(mail.outbox) == 1
+        email = mail.outbox[0]
+        assert email.subject == 'Ative sua conta'
+        assert 'resend@test.com' in email.to
+
+        # Extract the new token from the email
+        match = re.search(r'/activate/([0-9a-fA-F-]{36})', email.body)
+        new_activation_token_id = match.group(1) if match else None
+        assert new_activation_token_id is not None, 'New activation token not found in email body'
+
+        # Verify the new token is different from the old one
+        assert new_activation_token_id != old_token_id
+
+        # Try to activate with the old token - should still fail
+        response = client.patch(
+            f'/api/v1/users/activate/{old_token_id}',
+            content_type='application/json',
+        )
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+
+        # Activate with the new token - should succeed
+        response = client.patch(
+            f'/api/v1/users/activate/{new_activation_token_id}',
+            content_type='application/json',
+        )
+        user_activated = response.json()
+
+        assert response.status_code == HTTPStatus.OK
+        assert user_activated['username'] == 'resend_test'
+        assert user_activated['is_active'] is True
+
+
+@pytest.mark.django_db
+def test_resend_activation_with_valid_token(client):
+    """Test that resend fails when token is still valid"""
+    # Get current time
+    now = timezone.now()
+
+    # Create user
+    with freeze_time(now):
+        user_payload = {
+            'username': 'valid_token_test',
+            'first_name': 'Valid',
+            'last_name': 'Token',
+            'email': 'validtoken@test.com',
+            'password': 'testpassword',
+        }
+        response = client.post(
+            '/api/v1/users',
+            data=json.dumps(user_payload),
+            content_type='application/json',
+        )
+        user_id = response.json()['id']
+
+        # Get the activation token
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        activation_token = ActivationToken.objects.get(user=user)
+
+    # Try to resend while token is still valid - should fail
+    with freeze_time(now + timedelta(minutes=5)):
+        response = client.post(
+            f'/api/v1/users/resend-activation/{activation_token.id}',
+            content_type='application/json',
+        )
+
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_resend_activation_with_already_used_token(client):
+    """Test that resend fails when token has already been used"""
+    # Get current time
+    now = timezone.now()
+
+    # Create user
+    with freeze_time(now):
+        user_payload = {
+            'username': 'used_token_test',
+            'first_name': 'Used',
+            'last_name': 'Token',
+            'email': 'usedtoken@test.com',
+            'password': 'testpassword',
+        }
+        response = client.post(
+            '/api/v1/users',
+            data=json.dumps(user_payload),
+            content_type='application/json',
+        )
+        user_id = response.json()['id']
+
+        # Get the activation token
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        activation_token = ActivationToken.objects.get(user=user)
+
+        # Extract token from email and activate user
+        assert len(mail.outbox) == 1
+        email = mail.outbox[0]
+        match = re.search(r'/activate/([0-9a-fA-F-]{36})', email.body)
+        token_from_email = match.group(1) if match else None
+
+        # Activate the user
+        client.patch(f'/api/v1/users/activate/{token_from_email}')
+
+    # Move time forward so token is expired and already used
+    with freeze_time(now + timedelta(minutes=16)):
+        response = client.post(
+            f'/api/v1/users/resend-activation/{activation_token.id}',
+            content_type='application/json',
+        )
+
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_resend_activation_with_already_active_user(client):
+    """Test that resend fails when user is already activated"""
+    # Get current time
+    now = timezone.now()
+
+    # Create user and immediately activate
+    with freeze_time(now):
+        user_payload = {
+            'username': 'already_active_test',
+            'first_name': 'Already',
+            'last_name': 'Active',
+            'email': 'alreadyactive@test.com',
+            'password': 'testpassword',
+        }
+        response = client.post(
+            '/api/v1/users',
+            data=json.dumps(user_payload),
+            content_type='application/json',
+        )
+        user_id = response.json()['id']
+
+        # Get the activation token
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        activation_token = ActivationToken.objects.get(user=user)
+
+        # Extract token from email and activate user
+        assert len(mail.outbox) == 1
+        email = mail.outbox[0]
+        match = re.search(r'/activate/([0-9a-fA-F-]{36})', email.body)
+        token_from_email = match.group(1) if match else None
+
+        # Activate the user
+        response = client.patch(f'/api/v1/users/activate/{token_from_email}')
+        assert response.status_code == HTTPStatus.OK
+
+    # Move time forward and try to resend
+    with freeze_time(now + timedelta(minutes=16)):
+        response = client.post(
+            f'/api/v1/users/resend-activation/{activation_token.id}',
+            content_type='application/json',
+        )
+
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_resend_activation_invalid_token(client):
+    """Test that resend fails with invalid token ID"""
+    token_id = uuid.uuid4()
+
+    response = client.post(
+        f'/api/v1/users/resend-activation/{token_id}',
+        content_type='application/json',
+    )
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
 @pytest.mark.django_db
 def test_get_current_user_admin(client, create_admin_access_token):
     """Test that admin can get their own profile"""
