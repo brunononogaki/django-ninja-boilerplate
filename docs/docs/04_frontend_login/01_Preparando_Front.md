@@ -83,7 +83,7 @@ export const API_ENDPOINTS = {
     CREATE: "/api/v1/users",
     UPDATE: (id) => `/api/v1/users/${id}`,
     DELETE: (id) => `/api/v1/users/${id}`,
-    BY_USERNAME: (username) => `/api/v1/users/username/${username}`,
+    CHANGE_PASSWORD: (id) => `/api/v1/users/${id}/change-password`,    
   },
 
   // Status endpoint
