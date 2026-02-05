@@ -1,14 +1,20 @@
 # Criando a tela de edição de dados do usuário
 
-Atualmente depois do login com sucesso do usuário, estamos apenas abrindo uma tela super simples de Olá, <username>, e um botão de logout.
+Atualmente depois do login com sucesso do usuário, estamos apenas abrindo uma tela super simples de **Olá, username**, e um botão de logout.
 
 Vamos incrementar um pouco isso. Já que temos os dados do usuário que chegam do endpoint `/me`, podemos populá-los em um formulário, com a opção de o usuário alterar esses dados, inclusive a senha! E assim podemos testar os métodos de `PATCH` de `/users/{user_id}` e `/users/{user_id}/change-password`:
 
 ## Trazendo os dados do usuário
 
-A variável `userData` já tem todas as informações do usuário que retornam da API. Então basta criarmos um form, colocando esses valores por padrão. Vamos aproveitar para criar um botão "Editar", que ao ser clicado, liberamos as caixas para edição.
+A função `getCurrentUser()` já traz os dados do usuário autenticado. Então basta criarmos um form, colocando esses valores por padrão. Vamos aproveitar para criar um botão "Editar", que ao ser clicado, liberamos as caixas para edição.
 
-```javascript title="./next/pages/home.jsx"
+Primeiramente, colocaremos essa chamada da função `getCurrentUser()` dentro de um `useEffect()`, para que os dados do usuário já sejam trazidos no momento em que o componente é montado, e vamos popular esses dados na variável `formData`, que por sua vez será usada dentro das caixas dos `<input>`
+
+E o botão de Editar vai basicamente chamar uma função `handleEditToggle`, que vai setar o state `setIsEditing` para True, e esse valor vai controlar os campos de `disabled` dos inputs.
+
+Além disso, teremos também a função `handleInputChange`, que é chamada na alteração de cada um dos campos editáveis. E o que ela faz é atualizar o valor atual na variável `formData`, para podermos usar futuramente na hora de salvar. 
+
+```javascript title="./next/pages/home.jsx" hl_lines="9 10-15 25-50 60-71 103-114 122-133 141-152 160-171 176-185"
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { getToken, logoutUser, getCurrentUser } from "utils/auth";
@@ -207,13 +213,20 @@ export default function Home() {
 }
 ```
 
+!!! success
+
+    Agora a tela mostra os dados de username, nome, sobrenome e e-mail do usuário, além de um botão de "Editar", que desbloqueia os campos para permitir a edição. Por enquanto ainda não é possível alterar nada, porque não temos um botão de salvar.
+
+    ![alt text](static/user-profile.png)
+
+
 ## Alterando os dados do usuário
 
 Show, agora sim vamos criar um botão de submit para salvar esses dados. 
 
 ### Criando o `utils/users.js`
 
-Veja que ainda não temos o arquivo `utils/users.js` para tratar essas requests para o endpoint de `/users`, ne? Vamos criá-lo, já aproveitando para criar as funções de get, delete, patch.
+Veja que ainda não temos o arquivo `utils/users.js` para tratar essas requests para o endpoint de `/users`, ne? Vamos criá-lo, já aproveitando para criar as funções de `GET`, `DELETE` e `PATCH`.
 
 ```javascript title="./next/utils/users.js"
 /**
@@ -343,13 +356,13 @@ export async function deleteUser(userId) {
 ```
 !!! note
 
-    Veja que movi a função getCurrentUser para esse novo arquivo, removendo do `auth.js`, já que se trata de uma função do usuário, e não da autenticação.
+    Veja que movi a função getCurrentUser para esse novo arquivo, removendo do `auth.js`, já que se trata de uma função do usuário, e não da autenticação. É preciso alterar no import do arqui
 
 ### Submetendo o formulário de alteração de dados
 
-Agora basta criarmos uma função `handleSave` na nossa página, que vai invocar a função `updateUser`, que criamos lá no `utils/users.js`.
+Agora temos que criar um botão de Salvar, que ao ser clicado, invoca uma função `handleSave` na nossa página. Essa função `handleSave` vai chamar a função `updateUser()`, que criamos lá no `utils/users.js`, passando os valores do `formData` como payload.
 
-```javascript title="./next/pages/home.jsx" hl_lines="32-49"
+```javascript title="./next/pages/home.jsx" hl_lines="84-102 214-220"
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { getToken, logoutUser } from "utils/auth";
@@ -608,7 +621,10 @@ export default function Home() {
 
 Para a alteração de senha, vamos criar mais 3 campos: dois para o usuário digitar uma senha nova, e um para digitar a senha atual. Para a interface ficar mais limpa, vamos criar um botão "Alterar Senha", que se clicado, vai setar a variável `isPasswordModalOpen` como True, e vai exibir um modal, que escreveremos em um componente chamado `ChangePasswordModal`. Futuramente, podemos até jogar esse modal em uma pasta de componentes reutilizáveis, mas por enquanto vamos deixar nessa página mesmo.
 
-```javascript title="./next/pages/home.jsx" hl_lines="5,20,107-185,344-360"
+Aqui precisaremos de umas funções auxiliares, como uma `validadePasswordForm` para validar se as senhas estão iguais e se tem pelo menos 8 caracteres, se a senha nova e antiga não são as mesmas, etc. Mas a função mais importante será a `handlePasswordSubmit()`, que será chamada no click do botão de salvar, e é ela que vai chamar a função `changeUserPassword()` que definimos no nosso `utils/users.js`.
+
+
+```javascript title="./next/pages/home.jsx" hl_lines="19 105-111 113-158 160-200 345-351 354-359 365-586"
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { getToken, logoutUser } from "utils/auth";
