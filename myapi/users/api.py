@@ -13,6 +13,7 @@ from .schemas import (
     UserPatchSchema,
     UserWithGroupsSchema,
 )
+from .models import ActivationToken
 from .services import send_activation_email, verify_activation_token
 
 router = Router(tags=['Users'])
@@ -201,7 +202,29 @@ def activate_user(request, token_id: uuid.UUID):
 
     if user is None:
         logger.warning(f'Attempt to activate with invalid token: token_id={token_id}')
-        raise ValidationError('Invalid or expired activation token')
+        raise ValidationError('Invalid activation token.')
 
     logger.info(f'User {user.username} activated')
+    return Response(UserWithGroupsSchema.from_orm(user), status=200)
+
+
+@router.post(
+    'users/resend-activation/{token_id}',
+    response=UserWithGroupsSchema,
+    summary='Generate new activation token',
+    description='Generate new activation token and send via e-mail',
+    auth=None,
+)
+def resend_activation(request, token_id: uuid.UUID):
+    user = verify_activation_token(str(token_id), is_resend=True)
+
+    # Send new activation email (which creates a new token)
+    try:
+        send_activation_email(user)
+        logger.info(f'New activation email sent to {user.email} (old token: {token_id})')
+    except Exception as e:
+        logger.error(f'Failed to send activation email to {user.email}: {e}')
+        raise ServiceError('Failed to send activation email. Please try again later')
+
+    logger.info(f'User {user.username} (id={user.id}) requested token resend')
     return Response(UserWithGroupsSchema.from_orm(user), status=200)

@@ -8,6 +8,7 @@ from loguru import logger
 from infra.mailer import send_message
 
 from .models import ActivationToken
+from ..core.exceptions import ValidationError
 
 User = get_user_model()
 
@@ -90,7 +91,7 @@ def send_activation_email(user, token_expiry_minutes=15):
         raise
 
 
-def verify_activation_token(token_id: str):
+def verify_activation_token(token_id: str, is_resend: bool = False):
     """
     Verify activation token.
 
@@ -107,21 +108,37 @@ def verify_activation_token(token_id: str):
             id=token_id,
         )
     except ActivationToken.DoesNotExist:
-        logger.warning(f'Invalid activation token: token_id={token_id}')
-        return None
+        logger.warning(f'Attempt to resend activation with invalid token: token_id={token_id}')
+        raise ValidationError('Activation token not found')
 
-    # Check if token is expired
-    if timezone.now() > activation_token.expires_at:
-        logger.warning(f'Activation token expired for user {activation_token.user_id}')
-        return None
+    # Get the associated user
+    user = activation_token.user
 
-    # Check if token is already used
-    if activation_token.used_at is not None:
-        logger.warning(f'Activation token already used for user {activation_token.user_id}')
-        return None
+    # Check if user is already active
+    if user.is_active:
+        logger.warning(f'Attempt to resend activation for already active user: {user.username}')
+        raise ValidationError('User account is already activated')
+
+    # If requesting a new token, we don't need to check if it is expired or used, just return the user
+    if is_resend:
+        # Check if token is expired
+        if timezone.now() < activation_token.expires_at:
+            logger.warning(f'Attempt to resend activation with valid token: token_id={token_id}')
+            raise ValidationError('Token is still valid. Use the existing token to activate your account')
+        return user
+
+    else:
+        # Check if token is expired
+        if timezone.now() > activation_token.expires_at:
+            logger.warning(f'Activation token is expired: token_id={token_id}')
+            raise ValidationError('Token is expired, please request a new one')
+
+        # Check if token is already used
+        if activation_token.used_at is not None:
+            logger.warning(f'Activation token already used for user {activation_token.user_id}')
+            return activation_token.user
 
     # Activate user
-    user = activation_token.user
     user.is_active = True
     user.save()
 
