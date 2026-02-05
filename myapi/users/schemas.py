@@ -33,3 +33,8 @@ class UserPatchSchema(Schema):
     first_name: str | None = None
     last_name: str | None = None
     email: str | None = None
+
+
+class UserPatchPasswordSchema(Schema):
+    current_password: str = Field(..., example='strongpassword')
+    new_password: str = Field(..., example='strongpassword')

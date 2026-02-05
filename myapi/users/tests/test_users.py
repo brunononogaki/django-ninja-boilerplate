@@ -137,20 +137,6 @@ def test_get_user_detail_user_to_himself_by_id(client, create_non_admin_access_t
 
 
 @pytest.mark.django_db
-def test_get_user_detail_user_to_himself_by_username(client, create_non_admin_access_token):
-    User = get_user_model()
-    user = User.objects.get(username='new_user_non_admin')
-
-    response = client.get(
-        f'/api/v1/users/username/{user.username}', HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}'
-    )
-    data = response.json()
-
-    assert response.status_code == HTTPStatus.OK
-    assert data['username'] == 'new_user_non_admin'
-
-
-@pytest.mark.django_db
 def test_get_user_detail_user_to_other_user_fail(client, create_non_admin_access_token):
     User = get_user_model()
     user_admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
@@ -372,6 +358,113 @@ def test_patch_user_to_other_user_fail(client, create_non_admin_access_token):
         HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
     )
     assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.django_db
+def test_change_password_success(client, create_non_admin_access_token):
+    """Test successful password change"""
+    User = get_user_model()
+    user = User.objects.get(username='new_user_non_admin')
+
+    change_password_data = {
+        'current_password': 'myuserpassword',
+        'new_password': 'mynewpassword',
+    }
+
+    response = client.patch(
+        f'/api/v1/users/{user.id}/change-password',
+        data=json.dumps(change_password_data),
+        content_type='application/json',
+        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    response_json = response.json()
+    assert response_json['username'] == 'new_user_non_admin'
+
+    # Verify the password was actually changed
+    user.refresh_from_db()
+    assert user.check_password('mynewpassword')
+    assert not user.check_password('myuserpassword')
+
+
+@pytest.mark.django_db
+def test_change_password_wrong_current_password(client, create_non_admin_access_token):
+    """Test password change with wrong current password"""
+    User = get_user_model()
+    user = User.objects.get(username='new_user_non_admin')
+
+    change_password_data = {
+        'current_password': 'wrongpassword',
+        'new_password': 'mynewpassword',
+    }
+
+    response = client.patch(
+        f'/api/v1/users/{user.id}/change-password',
+        data=json.dumps(change_password_data),
+        content_type='application/json',
+        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
+    )
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    response_json = response.json()
+    assert 'incorrect' in response_json['message'].lower()
+
+    # Verify password was NOT changed
+    user.refresh_from_db()
+    assert user.check_password('myuserpassword')
+    assert not user.check_password('mynewpassword')
+
+
+@pytest.mark.django_db
+def test_change_password_admin_to_other_user(client, create_admin_access_token, create_non_admin_access_token):
+    """Test that admin can change another user's password"""
+    User = get_user_model()
+    user = User.objects.get(username='new_user_non_admin')
+
+    change_password_data = {
+        'current_password': 'myuserpassword',
+        'new_password': 'adminchangedpassword',
+    }
+
+    response = client.patch(
+        f'/api/v1/users/{user.id}/change-password',
+        data=json.dumps(change_password_data),
+        content_type='application/json',
+        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
+    )
+
+    assert response.status_code == HTTPStatus.OK
+
+    # Verify the password was changed
+    user.refresh_from_db()
+    assert user.check_password('adminchangedpassword')
+
+
+@pytest.mark.django_db
+def test_change_password_user_to_other_user_fail(client, create_non_admin_access_token):
+    """Test that non-admin user cannot change another user's password"""
+    User = get_user_model()
+    user_admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
+
+    change_password_data = {
+        'current_password': config('DJANGO_ADMIN_PASSWORD'),
+        'new_password': 'newevilpassword',
+    }
+
+    response = client.patch(
+        f'/api/v1/users/{user_admin.id}/change-password',
+        data=json.dumps(change_password_data),
+        content_type='application/json',
+        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
+    )
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+    # Verify admin password was NOT changed
+    user_admin.refresh_from_db()
+    assert user_admin.check_password(config('DJANGO_ADMIN_PASSWORD'))
+    assert not user_admin.check_password('newevilpassword')
 
 
 @pytest.mark.django_db

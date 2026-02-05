@@ -155,21 +155,3 @@ export async function refreshAccessToken(refreshToken) {
 
   return response;
 }
-
-/**
- * Buscar dados do usuário autenticado
- * Usa o token armazenado para buscar os dados do usuário logado
- *
- * @returns {Promise} - Resposta com dados do usuário
- *
- * @example
- * const user = await getCurrentUser();
- * // { id: '...', username: 'bruno', email: 'bruno@email.com', ... }
- */
-export async function getCurrentUser() {
-  const response = await apiCall(API_ENDPOINTS.USERS.ME, {
-    method: "GET",
-  });
-
-  return response;
-}
