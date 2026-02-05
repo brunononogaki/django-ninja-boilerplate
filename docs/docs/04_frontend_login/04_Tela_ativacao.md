@@ -10,7 +10,6 @@ Pelo padrão do Next.JS, para criarmos uma rota dinâmica, precisamos criar a es
 
 O valor passado no `token_id` pode ser recuperado na rota através da variável `router.query.token_id`
 
-
 ```javascript title="./next/pages/activate/[token_id]/index.jsx"
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
@@ -137,11 +136,18 @@ export default function Activate() {
 }
 ```
 
+!!! success
+
+    Legal, com isso a nossa página já está conseguindo ativar com sucesso a conta de um usuário!
+
+    ![alt text](static/activation_success.png)
+
+
 ## Criando sistema de reenvio de token
 
 No caso de o usuário tentar ativar sua conta com um Token expirado, precisamos dar a ele a opção de gerar um novo token. Lá no back já temos criada a rota de `resend-token`, então no caso de a API de `PATCH` do `/activate` retornar algum erro com a string "expired", setaremos um novo state `isTokenExpired`, e exibiremos um botão de gerar um novo token.
 
-```javascript title="./next/pages/activate/[token_id]/index.jsx" hl_lines="8,9,20-23,35-38,61-79,176-181,193-202"
+```javascript title="./next/pages/activate/[token_id]/index.jsx" hl_lines="39-43 55-86 151-167"
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import API_BASE_URL, { API_ENDPOINTS } from "../../../config/api";
@@ -151,8 +157,8 @@ export default function Activate() {
   const { token_id } = router.query;
   const [status, setStatus] = useState("loading"); // loading, success, error, resending
   const [message, setMessage] = useState("");
-  const [isTokenExpired, setIsTokenExpired] = useState(false); // NEW
-  const [isResending, setIsResending] = useState(false); // NEW
+  const [isTokenExpired, setIsTokenExpired] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   useEffect(() => {
     if (!token_id) return;
@@ -344,9 +350,6 @@ export default function Activate() {
 
 !!! success
 
-    Pronto! Ja temos a nossa tela de ativação pronta. Agora quando o usuário clicar no link para ativar sua conta, ele receberá essa mensagem de confirmação!
-    ![alt text](static/activation_success.png)
-
-    Mas caso o token esteja expirado, ele terá a opção de gerar um novo:
+    Pronto! Ja temos a nossa tela de ativação pronta. Agora caso o token esteja expirado, o usuário terá a opção de gerar um novo:
 
     ![alt text](static/activation_failed.png)
