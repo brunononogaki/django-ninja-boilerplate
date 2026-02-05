@@ -350,6 +350,41 @@ CONTAINER ID   IMAGE                    COMMAND                  CREATED        
 056561459f60   postgres:17.0            "docker-entrypoint.s…"   6 seconds ago   Up 6 seconds           5432/tcp                                                                                       postgres-prod
 ```
 
+!!! tip
+
+    Em produção, o Django não serve arquivos estáticos automaticamente, então a interface do `/admin` ficará sem a formatação do CSS e sem as imagens. Para resolver isso, precisamos rodar um `python manage.py collectstatic` no `Dockerfile-pro`, e a forma mais simples de servir esses arquivos é instalando uma lib chamada `Whitenoise`:
+
+    ```bash
+    poetry add whitenoise
+    ```
+
+    E no `settings.py` vamos adicionar isso:
+    ```python title="./myapi/settings.py"
+    STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+    # WhiteNoise configuration
+    WHITENOISE_AUTOREFRESH = DEBUG
+    WHITENOISE_USE_FINDERS = True
+    WHITENOISE_MIMETYPES = {
+        '.woff2': 'font/woff2',
+        '.woff': 'font/woff',
+        '.ttf': 'font/ttf',
+    }
+
+    MIDDLEWARE = [
+    # Add this:
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    ]
+    ```
+
+    Por fim, no `Dockerfile-pro`, adicionaremos isso antes do `EXPOSE 8000`:
+    ```
+    # Collect static files
+    RUN python manage.py collectstatic --noinput
+    ```
+    
+
+
 !!! success
 
     Sucesso!!! Nosso CI/CD ta prontinho, com testes automatizados e deploy para produção!
