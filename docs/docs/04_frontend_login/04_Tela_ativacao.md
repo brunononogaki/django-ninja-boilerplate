@@ -10,6 +10,7 @@ Pelo padrão do Next.JS, para criarmos uma rota dinâmica, precisamos criar a es
 
 O valor passado no `token_id` pode ser recuperado na rota através da variável `router.query.token_id`
 
+
 ```javascript title="./next/pages/activate/[token_id]/index.jsx"
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
@@ -140,15 +141,6 @@ export default function Activate() {
 
 No caso de o usuário tentar ativar sua conta com um Token expirado, precisamos dar a ele a opção de gerar um novo token. Lá no back já temos criada a rota de `resend-token`, então no caso de a API de `PATCH` do `/activate` retornar algum erro com a string "expired", setaremos um novo state `isTokenExpired`, e exibiremos um botão de gerar um novo token.
 
-### Principais mudanças:
-
-- **\[NEW\]** Estados `isTokenExpired` e `isResending` para controlar o reenvio
-- **\[NEW\]** Função `handleResendActivation()` para reenviar o token
-- **\[MODIFIED\]** Detecção de token expirado no bloco catch
-- **\[NEW\]** Novo status "resending" para feedback ao usuário
-- **\[NEW\]** Botão "Reenviar Email de Ativação" condicional no JSX
-- **\[MODIFIED\]** Estrutura de botões atualizada com flexbox e múltiplos botões
-
 ```javascript title="./next/pages/activate/[token_id]/index.jsx" hl_lines="8,9,20-23,35-38,61-79,176-181,193-202"
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
@@ -159,8 +151,8 @@ export default function Activate() {
   const { token_id } = router.query;
   const [status, setStatus] = useState("loading"); // loading, success, error, resending
   const [message, setMessage] = useState("");
-  const [isTokenExpired, setIsTokenExpired] = useState(false); // \[NEW\]
-  const [isResending, setIsResending] = useState(false); // \[NEW\]
+  const [isTokenExpired, setIsTokenExpired] = useState(false); // NEW
+  const [isResending, setIsResending] = useState(false); // NEW
 
   useEffect(() => {
     if (!token_id) return;
@@ -188,7 +180,7 @@ export default function Activate() {
           setStatus("error");
           setMessage(data.message);
 
-          // \[NEW\] Verifica se é erro de token expirado
+          // Verifica se é erro de token expirado
           const fullErrorText = JSON.stringify(data).toLowerCase();
           if (fullErrorText.includes("expired")) {
             setIsTokenExpired(true);
@@ -205,7 +197,6 @@ export default function Activate() {
   }, [token_id, router]);
 
   const handleResendActivation = async () => {
-    // \[NEW\]
     setIsResending(true);
     try {
       const response = await fetch(
@@ -254,6 +245,7 @@ export default function Activate() {
             </p>
           </>
         )}
+
         {status === "success" && (
           <>
             <div className="flex justify-center mb-4">
@@ -278,6 +270,7 @@ export default function Activate() {
             </p>
           </>
         )}
+
         {status === "error" && (
           <>
             <div className="flex justify-center mb-4">
@@ -300,16 +293,13 @@ export default function Activate() {
             </h1>
             <p className="text-red-600 mb-4">{message}</p>
             <div className="flex gap-2 flex-col">
-              {" "}
-              {/* \[MODIFIED\] */}
               {isTokenExpired && (
                 <button
                   onClick={handleResendActivation}
                   disabled={isResending}
                   className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
                 >
-                  {isResending ? "Reenviando..." : "Reenviar Email de Ativação"}{" "}
-                  {/* \[NEW\] */}
+                  {isResending ? "Reenviando..." : "Reenviar Email de Ativação"}
                 </button>
               )}
               <button
@@ -321,6 +311,7 @@ export default function Activate() {
             </div>
           </>
         )}
+
         {status === "resending" && (
           <>
             <div className="flex justify-center mb-4">
@@ -344,8 +335,7 @@ export default function Activate() {
               Redirecionando para o login...
             </p>
           </>
-        )}{" "}
-        {/* \[NEW\] */}
+        )}
       </div>
     </div>
   );
