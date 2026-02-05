@@ -11,6 +11,8 @@ export const API_ENDPOINTS = {
     LOGIN: "/api/v1/login",
     REFRESH: "/api/v1/refresh",
     ACTIVATE: (tokenId) => `/api/v1/users/activate/${tokenId}`,
+    RESEND_ACTIVATION: (tokenId) =>
+      `/api/v1/users/resend-activation/${tokenId}`,
   },
 
   // Users endpoints
