@@ -7,8 +7,8 @@ from loguru import logger
 
 from infra.mailer import send_message
 
-from .models import ActivationToken
 from ..core.exceptions import ValidationError
+from .models import ActivationToken
 
 User = get_user_model()
 
