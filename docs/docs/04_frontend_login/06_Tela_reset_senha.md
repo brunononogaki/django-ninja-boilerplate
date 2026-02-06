@@ -13,7 +13,7 @@ Primeiramente, vamos colocar no arquivo `config/api.js` essas rotas que foram cr
   },
 ```
 
-E já podemos também deixar essas funções de `requestPasswordReset` e `confirmPasswordReset` criadas no arquivo `utils/users.js`:
+E já podemos também deixar essas funções de `validatePasswordReset`, `requestPasswordReset` e `confirmPasswordReset` criadas no arquivo `utils/users.js`:
 
 ```javascript title="./next/utils/users.js"
 
