@@ -122,3 +122,72 @@ export async function deleteUser(userId) {
 
   return response;
 }
+
+/**
+ * Solicitar reset de senha
+ * Envia email com link de reset para o usuário
+ * Não requer autenticação (endpoint público)
+ *
+ * @param {string} email - Email do usuário
+ * @returns {Promise} - Resposta com mensagem de sucesso
+ *
+ * @example
+ * const result = await requestPasswordReset('usuario@email.com');
+ * // { message: 'If email exists, a reset link will be sent' }
+ */
+export async function requestPasswordReset(email) {
+  const response = await apiCall(API_ENDPOINTS.PASSWORD_RESET.REQUEST, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+
+  return response;
+}
+
+/**
+ * Confirmar reset de senha
+ * Altera a senha usando o token de reset enviado por email
+ * Não requer autenticação (endpoint público)
+ *
+ * @param {string} tokenId - ID do token de reset (UUID)
+ * @param {string} newPassword - Nova senha
+ * @returns {Promise} - Resposta com mensagem de sucesso
+ *
+ * @example
+ * const result = await confirmPasswordReset('token-uuid-123', 'novaSenha456');
+ * // { message: 'Password changed successfully' }
+ */
+export async function confirmPasswordReset(tokenId, newPassword) {
+  const endpoint = API_ENDPOINTS.PASSWORD_RESET.CONFIRM(tokenId);
+
+  const response = await apiCall(endpoint, {
+    method: "POST",
+    body: JSON.stringify({ new_password: newPassword }),
+  });
+
+  return response;
+}
+
+/**
+ * Validar token de reset de senha
+ * Verifica se o token é válido, não expirado e ainda não foi usado
+ * Não requer autenticação (endpoint público)
+ *
+ * @param {string} tokenId - ID do token de reset (UUID)
+ * @returns {Promise} - Objeto com valid (boolean) e message (string)
+ *
+ * @example
+ * const result = await validatePasswordReset('token-uuid-123');
+ * // { valid: true, message: 'Token is valid' }
+ * // ou
+ * // { valid: false, message: 'Token has expired' }
+ */
+export async function validatePasswordReset(tokenId) {
+  const endpoint = API_ENDPOINTS.PASSWORD_RESET.VALIDATE(tokenId);
+
+  const response = await apiCall(endpoint, {
+    method: "GET",
+  });
+
+  return response;
+}

@@ -12,6 +12,7 @@ from django.utils import timezone
 from freezegun import freeze_time
 
 from myapi.users.models import ActivationToken
+from myapi.users.models import PasswordResetToken
 
 
 @pytest.fixture
@@ -871,3 +872,327 @@ def test_get_current_user_non_admin(client, create_non_admin_access_token):
     assert data['username'] == 'new_user_non_admin'
     assert data['email'] == 'user_new@admin.com'
     assert 'id' in data
+
+
+##############
+# Password Reset
+##############
+@pytest.mark.django_db
+def test_request_password_reset_success(client):
+    """Test successful password reset request"""
+    # Create a user
+    user_payload = {
+        'username': 'reset_test',
+        'first_name': 'Reset',
+        'last_name': 'Test',
+        'email': 'reset@test.com',
+        'password': 'testpassword',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    assert response.status_code == HTTPStatus.CREATED
+
+    # Clear mailbox
+    mail.outbox.clear()
+
+    # Request password reset
+    reset_payload = {'email': 'reset@test.com'}
+    response = client.post(
+        '/api/v1/users/password-reset/request',
+        data=json.dumps(reset_payload),
+        content_type='application/json',
+    )
+    data = response.json()
+    assert 'message' in data
+    assert response.status_code == HTTPStatus.OK
+    assert len(mail.outbox) == 1
+
+
+@pytest.mark.django_db
+def test_request_password_reset_non_existent_email(client):
+    """Test password reset request with non-existent email"""
+    reset_payload = {'email': 'nonexistent@test.com'}
+    response = client.post(
+        '/api/v1/users/password-reset/request',
+        data=json.dumps(reset_payload),
+        content_type='application/json',
+    )
+    data = response.json()
+
+    # Should return same message for security (no email enumeration)
+    assert response.status_code == HTTPStatus.OK
+    assert 'message' in data
+    # Should not send email
+    assert len(mail.outbox) == 0
+
+
+@pytest.mark.django_db
+def test_confirm_password_reset_success(client):
+    """Test successful password reset confirmation"""
+
+    # Create and activate a user
+    user_payload = {
+        'username': 'reset_confirm_test',
+        'first_name': 'Reset',
+        'last_name': 'Confirm',
+        'email': 'resetconfirm@test.com',
+        'password': 'testpassword',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    User = get_user_model()
+    user = User.objects.get(username='reset_confirm_test')
+    user.is_active = True
+    user.save()
+
+    # Create a password reset token
+    reset_token = PasswordResetToken.objects.create(
+        user=user,
+        expires_at=timezone.now() + timedelta(minutes=15),
+    )
+
+    # Confirm password reset
+    new_password_payload = {'new_password': 'newpassword123'}
+    response = client.post(
+        f'/api/v1/users/password-reset/{reset_token.id}/confirm',
+        data=json.dumps(new_password_payload),
+        content_type='application/json',
+    )
+
+    assert response.status_code == HTTPStatus.OK
+
+    # Check that password was changed
+    user.refresh_from_db()
+    assert user.check_password('newpassword123')
+
+    # Check that token is marked as used
+    reset_token.refresh_from_db()
+    assert reset_token.used_at is not None
+
+
+@pytest.mark.django_db
+def test_confirm_password_reset_invalid_token(client):
+    """Test password reset confirmation with invalid token"""
+    # Try to confirm with non-existent token
+    token_id = uuid.uuid4()
+    new_password_payload = {'new_password': 'newpassword123'}
+
+    response = client.post(
+        f'/api/v1/users/password-reset/{token_id}/confirm',
+        data=json.dumps(new_password_payload),
+        content_type='application/json',
+    )
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_confirm_password_reset_expired_token(client):
+    """Test password reset confirmation with expired token"""
+
+    # Create and activate a user
+    user_payload = {
+        'username': 'reset_expire_test',
+        'first_name': 'Reset',
+        'last_name': 'Expire',
+        'email': 'resetexpire@test.com',
+        'password': 'testpassword',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    User = get_user_model()
+    user = User.objects.get(username='reset_expire_test')
+    user.is_active = True
+    user.save()
+
+    # Get current time
+    now = timezone.now()
+
+    # Create an expired password reset token
+    with freeze_time(now - timedelta(minutes=20)):
+        reset_token = PasswordResetToken.objects.create(
+            user=user,
+            expires_at=now - timedelta(minutes=5),  # Already expired
+        )
+
+    # Try to confirm with expired token
+    new_password_payload = {'new_password': 'newpassword123'}
+    response = client.post(
+        f'/api/v1/users/password-reset/{reset_token.id}/confirm',
+        data=json.dumps(new_password_payload),
+        content_type='application/json',
+    )
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_confirm_password_reset_already_used_token(client):
+    """Test password reset confirmation with already used token"""
+
+    # Create and activate a user
+    user_payload = {
+        'username': 'reset_used_test',
+        'first_name': 'Reset',
+        'last_name': 'Used',
+        'email': 'resetused@test.com',
+        'password': 'testpassword',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    User = get_user_model()
+    user = User.objects.get(username='reset_used_test')
+    user.is_active = True
+    user.save()
+
+    # Create a password reset token and mark as used
+    reset_token = PasswordResetToken.objects.create(
+        user=user,
+        expires_at=timezone.now() + timedelta(minutes=15),
+        used_at=timezone.now(),
+    )
+
+    # Try to confirm with already used token
+    new_password_payload = {'new_password': 'newpassword123'}
+    response = client.post(
+        f'/api/v1/users/password-reset/{reset_token.id}/confirm',
+        data=json.dumps(new_password_payload),
+        content_type='application/json',
+    )
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_validate_password_reset_token_success(client):
+    """Test successful password reset token validation"""
+
+    # Create and activate a user
+    user_payload = {
+        'username': 'validate_test',
+        'first_name': 'Validate',
+        'last_name': 'Test',
+        'email': 'validate@test.com',
+        'password': 'testpassword',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    User = get_user_model()
+    user = User.objects.get(username='validate_test')
+
+    # Create a valid password reset token
+    reset_token = PasswordResetToken.objects.create(
+        user=user,
+        expires_at=timezone.now() + timedelta(minutes=15),
+    )
+
+    # Validate token
+    response = client.get(f'/api/v1/users/password-reset/{reset_token.id}/validate')
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert data['valid'] is True
+    assert 'message' in data
+
+
+@pytest.mark.django_db
+def test_validate_password_reset_token_invalid(client):
+    """Test validation with non-existent token"""
+    token_id = uuid.uuid4()
+
+    response = client.get(f'/api/v1/users/password-reset/{token_id}/validate')
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert data['valid'] is False
+    assert 'message' in data
+
+
+@pytest.mark.django_db
+def test_validate_password_reset_token_expired(client):
+    """Test validation with expired token"""
+
+    # Create and activate a user
+    user_payload = {
+        'username': 'validate_expire_test',
+        'first_name': 'Validate',
+        'last_name': 'Expire',
+        'email': 'validateexpire@test.com',
+        'password': 'testpassword',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    User = get_user_model()
+    user = User.objects.get(username='validate_expire_test')
+
+    # Get current time
+    now = timezone.now()
+
+    # Create an expired password reset token
+    with freeze_time(now - timedelta(minutes=20)):
+        reset_token = PasswordResetToken.objects.create(
+            user=user,
+            expires_at=now - timedelta(minutes=5),  # Already expired
+        )
+
+    # Try to validate expired token
+    response = client.get(f'/api/v1/users/password-reset/{reset_token.id}/validate')
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert data['valid'] is False
+    assert 'expired' in data['message'].lower()
+
+
+@pytest.mark.django_db
+def test_validate_password_reset_token_already_used(client):
+    """Test validation with already used token"""
+
+    # Create and activate a user
+    user_payload = {
+        'username': 'validate_used_test',
+        'first_name': 'Validate',
+        'last_name': 'Used',
+        'email': 'validateused@test.com',
+        'password': 'testpassword',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    User = get_user_model()
+    user = User.objects.get(username='validate_used_test')
+
+    # Create a password reset token and mark as used
+    reset_token = PasswordResetToken.objects.create(
+        user=user,
+        expires_at=timezone.now() + timedelta(minutes=15),
+        used_at=timezone.now(),
+    )
+
+    # Try to validate already used token
+    response = client.get(f'/api/v1/users/password-reset/{reset_token.id}/validate')
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert data['valid'] is False
+    assert 'used' in data['message'].lower()
