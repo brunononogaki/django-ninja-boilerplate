@@ -4,10 +4,11 @@ Atualmente já temos um endpoint de `PATCH` de users configurado, e dessa forma 
 
 Por isso, vamos criar endpoints na nossa API dedicados a essa função:
 
-- `api/v1/users/{id}/change-password`
-- `api/v1/users/reset-password/{token-id}`
+- **PATCH** `api/v1/users/{id}/change-password`
+- **POST**`api/v1/users/password-reset/request`
+- **GET** `api/v1/users/password-reset/{token-id}/validate`
+- **POST**`api/v1/users/password-reset/{token-id}/confirm`
 
-O primeiro será um simples `PATCH` no usuário, e o segundo, como o usuário não está logado, faremos mediante a um token, similar à forma como fazemos a ativação.
 
 ## Criando a rota `change-password`
 
@@ -198,7 +199,7 @@ def test_change_password_user_to_other_user_fail(client, create_non_admin_access
     assert not user_admin.check_password('newevilpassword')
 ```
 
-## Criando a rota `reset-password`
+## Criando as rotas de `password-reset`
 
 O reset de senha é um pouco mais complexo, porque temos que fazer parecido com o sistema de ativação de conta. Ou seja, o usuário solicita o reset passando o e-mail dele, o sistema gera um token com expiração de 15 minutos e manda por e-mail, o usuário entra no link de reset de senha, define a nova senha e salva.
 
@@ -231,7 +232,7 @@ E agora gerar a migration:
 python3 manage.py makemigrations users
 ```
 
-### Criando o endpoint `users/reset-password/request`
+### Criando o endpoint `users/password-reset/request`
 
 Esse será o endpoint que será chamado pelo front quando o usuário solicitar um password reset, e ele deverá receber como payload o `e-mail` do usuário (poderia ser o username também, aí vai do seu gosto). Aí a ideia é gerarmos um token e armazenarmos na base (exatamente como é feito com o de ativação, depois que o usuário cria um cadastro), e enviamos esse e-mail para o usuário.
 
@@ -297,7 +298,7 @@ def send_password_reset_email(user, token_expiry_minutes=15):
     )
 
     # Build password reset URL using the token id
-    reset_url = f'{protocol}://{frontend_fqdn}/reset-password/{reset_token.id}'
+    reset_url = f'{protocol}://{frontend_fqdn}/password-reset/{reset_token.id}'
 
     # Prepare email with HTML formatting
     html_body = f"""
@@ -352,7 +353,7 @@ def send_password_reset_email(user, token_expiry_minutes=15):
         raise ServiceError('An error ocurred when sending the e-mail')
 ```
 
-### Criando o endpoint `users/reset-password/{token_id}/validate`
+### Criando o endpoint `users/password-reset/{token_id}/validate`
 
 Esse endpoint receberá um GET apenas para validar se o token que o usuário tem é válido, e caso seja, o front-end abrirá o formulário para ele de fato fazer a alteração da senha.
 
@@ -402,7 +403,7 @@ def validate_password_reset_token(token_id: str):
     return {'valid': True, 'message': 'Token is valid'}
 ```
 
-### Criando o endpoint `users/reset-password/{token_id}/confirm`
+### Criando o endpoint `users/password-reset/{token_id}/confirm`
 
 Esse é o endpoint que fará a validação do token de reset de senha, e já deverá receber no payload a senha nova. Caso ele valide que o token é válido, faremos a atualização da senha do usuário.
 
