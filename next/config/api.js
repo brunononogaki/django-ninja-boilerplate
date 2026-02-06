@@ -26,6 +26,13 @@ export const API_ENDPOINTS = {
     CHANGE_PASSWORD: (id) => `/api/v1/users/${id}/change-password`,
   },
 
+  // Password Reset endpoints
+  PASSWORD_RESET: {
+    REQUEST: "/api/v1/users/password-reset/request",
+    VALIDATE: (tokenId) => `/api/v1/users/password-reset/${tokenId}/validate`,
+    CONFIRM: (tokenId) => `/api/v1/users/password-reset/${tokenId}/confirm`,
+  },
+
   // Status endpoint
   STATUS: "/api/v1/status",
 };

@@ -38,3 +38,11 @@ class UserPatchSchema(Schema):
 class UserPatchPasswordSchema(Schema):
     current_password: str = Field(..., example='strongpassword')
     new_password: str = Field(..., example='strongpassword')
+
+
+class PasswordResetRequestSchema(Schema):
+    email: str = Field(..., example='user@email.com')
+
+
+class PasswordResetConfirmSchema(Schema):
+    new_password: str = Field(..., example='strongpassword')

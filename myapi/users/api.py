@@ -8,14 +8,22 @@ from ninja.responses import Response
 
 from ..core.auth import AdminAuth, JWTAuth, OwnerOrAdminAuth
 from ..core.exceptions import ConflictError, NotFoundError, ServiceError, ValidationError
-from .models import ActivationToken
+from .models import ActivationToken, PasswordResetToken
 from .schemas import (
     UserCreateSchema,
     UserPatchSchema,
     UserPatchPasswordSchema,
+    PasswordResetRequestSchema,
+    PasswordResetConfirmSchema,
     UserWithGroupsSchema,
 )
-from .services import send_activation_email, verify_activation_token
+from .services import (
+    send_activation_email,
+    verify_activation_token,
+    send_password_reset_email,
+    confirm_password_reset_token,
+    validate_password_reset_token,
+)
 
 router = Router(tags=['Users'])
 
@@ -243,3 +251,68 @@ def resend_activation(request, token_id: uuid.UUID):
 
     logger.info(f'User {user.username} (id={user.id}) requested token resend')
     return Response(UserWithGroupsSchema.from_orm(user), status=200)
+
+
+##############
+# Password Reset
+##############
+@router.post(
+    'users/password-reset/request',
+    response={200: dict},
+    summary='Request password reset',
+    description='Request a password reset token via email',
+    auth=None,
+)
+def request_password_reset(request, data: PasswordResetRequestSchema):
+    try:
+        user = User.objects.get(email=data.email)
+    except User.DoesNotExist:
+        # For security, don't reveal if email exists
+        logger.warning(f'Password reset requested for non-existent email: {data.email}')
+        return Response({'message': 'If email exists, a reset link will be sent'}, status=200)
+
+    # Send password reset email (which creates the token internally)
+    try:
+        send_password_reset_email(user)
+        logger.info(f'Password reset email sent to {user.email}')
+    except Exception as e:
+        logger.error(f'Failed to send password reset email to {user.email}: {e}')
+
+    logger.info(f'User {user.username} requested password reset')
+    return Response({'message': 'If email exists, a reset link will be sent'}, status=200)
+
+
+@router.get(
+    'users/password-reset/{token_id}/validate',
+    response={200: dict},
+    summary='Validate password reset token',
+    description='Check if password reset token is valid and not expired',
+    auth=None,
+)
+def validate_password_reset(request, token_id: uuid.UUID):
+    result = validate_password_reset_token(str(token_id))
+    return Response(result, status=200)
+
+
+@router.post(
+    'users/password-reset/{token_id}/confirm',
+    response={200: dict},
+    summary='Confirm password reset',
+    description='Confirm password reset and set new password',
+    auth=None,
+)
+def confirm_password_reset(request, token_id: uuid.UUID, payload: PasswordResetConfirmSchema):
+    user = confirm_password_reset_token(str(token_id))
+
+    if user is None:
+        logger.warning(f'Attempt to change password with invalid token: token_id={token_id}')
+        raise ValidationError('Invalid password reset token.')
+
+    user.set_password(payload.new_password)
+    try:
+        user.save()
+        logger.info(f'User {user.username} (id={user.id}) changed password')
+        return Response({'message': 'Password changed successfully'}, status=200)
+    except Exception as e:
+        logger.error(f'Failed to update password for user {user.username}: {e}')
+        raise ServiceError('Failed to change password. Please try again later.')
