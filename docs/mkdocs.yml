@@ -25,6 +25,7 @@ nav:
       - 03. Criando a tela de cadastro: 04_frontend_login/03_Tela_cadastro.md
       - 04. Criando a tela de ativação: 04_frontend_login/04_Tela_ativacao.md
       - 05. Criando a tela de edição de dados do usuário: 04_frontend_login/05_Tela_edicao_dados.md
+      - 06. Criando a tela de reset de senha: 04_frontend_login/06_Tela_reset_senha.md
   - Apêndice:
       - 01. Configurando o Traefik: Appendix/01_Configurando_o_Traefik.md
 theme:
