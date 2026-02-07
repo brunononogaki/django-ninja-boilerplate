@@ -84,7 +84,7 @@ O fluxo de autenticação funciona da seguinte forma:
 
 Para ativar esse plugin, precisaremos fazer algumas configurações no arquivo `settings.py`
 
-```python file="./myapi/settings.py"
+```python title="./myapi/settings.py"
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -215,14 +215,14 @@ Ao final do wizard, clique em `Criar um cliente OAuth`
 
 6. Selecione o tipo de aplicativo `Aplication da Web`, e siga o Wizard:
 
-![alt text](gcp-tipo-aplicativo.png)
+![alt text](static/gcp-tipo-aplicativo.png)
 
 * Nome: Cliente Web 1
 * URIs de redirecionamento autorizados:
   * `http://localhost:8000/accounts/google/login/callback/`
-  * `https://react.brunononogaki.com/accounts/google/login/callback/`
+  * `https://myapi.brunononogaki.com/accounts/google/login/callback/`
 
-7. Salve os dados do Client ID e Secret Key no .env, nas variáveis `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`
+1. Salve os dados do Client ID e Secret Key no .env, nas variáveis `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`
 
 ![alt text](static/gcp-oauth-keys.png)
 
