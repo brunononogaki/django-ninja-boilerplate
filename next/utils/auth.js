@@ -52,12 +52,18 @@ export async function loginUser(username, password) {
  * const user = await signupUser('bruno', 'bruno@email.com', 'senha123', 'Bruno', 'Nonogaki');
  * // { id: '...', username: 'bruno', email: 'bruno@email.com', first_name: 'Bruno', last_name: 'Nonogaki' }
  */
-export async function signupUser(username, email, password, firstName, lastName) {
+export async function signupUser(
+  username,
+  email,
+  password,
+  firstName,
+  lastName,
+) {
   const response = await apiCall(API_ENDPOINTS.USERS.CREATE, {
     method: "POST",
-    body: JSON.stringify({ 
-      username, 
-      email, 
+    body: JSON.stringify({
+      username,
+      email,
       password,
       first_name: firstName,
       last_name: lastName,
@@ -146,6 +152,48 @@ export async function refreshAccessToken(refreshToken) {
   });
 
   // Atualizar tokens no localStorage
+  if (response.access_token) {
+    localStorage.setItem("access_token", response.access_token);
+  }
+  if (response.refresh_token) {
+    localStorage.setItem("refresh_token", response.refresh_token);
+  }
+
+  return response;
+}
+/**
+ * Iniciar login com Google
+ * Redireciona o usuário para a página de autenticação do Google
+ *
+ * @example
+ * const handleGoogleLogin = () => {
+ *   loginWithGoogle();
+ * };
+ */
+export function loginWithGoogle() {
+  const googleAuthUrl = `${API_BASE_URL}${API_ENDPOINTS.SOCIAL_AUTH.GOOGLE_LOGIN}`;
+  window.location.href = googleAuthUrl;
+}
+
+/**
+ * Obter token JWT após autenticação OAuth
+ * Chamado após o usuário ser redirecionado de volta do Google
+ * Envia os cookies da sessão Django e recebe JWT
+ *
+ * @returns {Promise} - Resposta com access_token e refresh_token
+ *
+ * @example
+ * // Após ser redirecionado de /accounts/google/login/callback/
+ * const response = await getSocialToken();
+ * // { access_token: '...', refresh_token: '...' }
+ */
+export async function getSocialToken() {
+  const response = await apiCall(API_ENDPOINTS.AUTH.SOCIAL_TOKEN, {
+    method: "POST",
+    credentials: "include", // Importante: envia cookies da sessão Django
+  });
+
+  // Salvar tokens no localStorage
   if (response.access_token) {
     localStorage.setItem("access_token", response.access_token);
   }

@@ -10,9 +10,15 @@ export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: "/api/v1/login",
     REFRESH: "/api/v1/refresh",
+    SOCIAL_TOKEN: "/api/v1/social-token",
     ACTIVATE: (tokenId) => `/api/v1/users/activate/${tokenId}`,
     RESEND_ACTIVATION: (tokenId) =>
       `/api/v1/users/resend-activation/${tokenId}`,
+  },
+
+  // Social Auth endpoints
+  SOCIAL_AUTH: {
+    GOOGLE_LOGIN: "/accounts/google/login/",
   },
 
   // Users endpoints

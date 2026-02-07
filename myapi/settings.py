@@ -44,6 +44,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # django-allauth
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    # custom apps
     'corsheaders',
     'django_extensions',
     'myapi.core',
@@ -57,6 +64,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # CORS
@@ -161,6 +169,9 @@ CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS', default='http://localhost:3000,http://127.0.0.1:3000', cast=Csv()
 )
 
+# Permitir credenciais (cookies) em requisições CORS
+CORS_ALLOW_CREDENTIALS = True
+
 # Email Configuration - Gmail via Django
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
@@ -169,3 +180,46 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('GMAIL_EMAIL', default='')
 EMAIL_HOST_PASSWORD = config('GMAIL_APP_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('GMAIL_EMAIL', default='')
+
+# SITE_ID (required for allauth)
+SITE_ID = 1
+
+# django-allauth settings
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',  # traditional login
+    'allauth.account.auth_backends.AuthenticationBackend',  # social login
+]
+
+# allauth config
+SOCIALACCOUNT_AUTO_SIGNUP = True  # Cria conta automaticamente
+ACCOUNT_EMAIL_REQUIRED = True  # Email obrigatório
+ACCOUNT_USERNAME_REQUIRED = True  # Username obrigatório (será gerado automaticamente)
+ACCOUNT_AUTHENTICATION_METHOD = 'email'  # Usa email para autenticar
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # Não requer verificação de email
+ACCOUNT_USER_MODEL_EMAIL_FIELD = 'email'  # Define email como campo principal
+ACCOUNT_USERNAME_BLACKLIST = []  # Remove restrições de username
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True  # Conecta automaticamente se email existir
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True  # Auto-conecta contas com mesmo email
+SOCIALACCOUNT_LOGIN_ON_GET = True  # Pula a página de confirmação e vai direto pro Google!
+
+# Adaptador customizado para gerar username automaticamente
+SOCIALACCOUNT_ADAPTER = 'myapi.core.adapters.SocialAccountAdapter'
+
+# Configurações de login
+FRONTEND_FQDN = config('FRONTEND_FQDN', default='localhost:3000')
+FRONTEND_PROTOCOL = 'https' if 'localhost' not in FRONTEND_FQDN else 'http'
+LOGIN_REDIRECT_URL = f'{FRONTEND_PROTOCOL}://{FRONTEND_FQDN}/accounts/google/login/callback'
+ACCOUNT_LOGOUT_REDIRECT_URL = f'{FRONTEND_PROTOCOL}://{FRONTEND_FQDN}/'
+
+# Configurações dos providers sociais
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        },
+    }
+}

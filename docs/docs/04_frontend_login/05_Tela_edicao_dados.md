@@ -12,7 +12,7 @@ Primeiramente, colocaremos essa chamada da função `getCurrentUser()` dentro de
 
 E o botão de Editar vai basicamente chamar uma função `handleEditToggle`, que vai setar o state `setIsEditing` para True, e esse valor vai controlar os campos de `disabled` dos inputs.
 
-Além disso, teremos também a função `handleInputChange`, que é chamada na alteração de cada um dos campos editáveis. E o que ela faz é atualizar o valor atual na variável `formData`, para podermos usar futuramente na hora de salvar. 
+Além disso, teremos também a função `handleInputChange`, que é chamada na alteração de cada um dos campos editáveis. E o que ela faz é atualizar o valor atual na variável `formData`, para podermos usar futuramente na hora de salvar.
 
 ```javascript title="./next/pages/home.jsx" hl_lines="9 10-15 25-50 60-71 103-114 122-133 141-152 160-171 176-185"
 import { useEffect, useState } from "react";
@@ -219,10 +219,9 @@ export default function Home() {
 
     ![alt text](static/user-profile.png)
 
-
 ## Alterando os dados do usuário
 
-Show, agora sim vamos criar um botão de submit para salvar esses dados. 
+Show, agora sim vamos criar um botão de submit para salvar esses dados.
 
 ### Criando o `utils/users.js`
 
@@ -354,6 +353,7 @@ export async function deleteUser(userId) {
   return response;
 }
 ```
+
 !!! note
 
     Veja que movi a função getCurrentUser para esse novo arquivo, removendo do `auth.js`, já que se trata de uma função do usuário, e não da autenticação. É preciso alterar no import do arqui
@@ -622,7 +622,6 @@ export default function Home() {
 Para a alteração de senha, vamos criar mais 3 campos: dois para o usuário digitar uma senha nova, e um para digitar a senha atual. Para a interface ficar mais limpa, vamos criar um botão "Alterar Senha", que se clicado, vai setar a variável `isPasswordModalOpen` como True, e vai exibir um modal, que escreveremos em um componente chamado `ChangePasswordModal`. Futuramente, podemos até jogar esse modal em uma pasta de componentes reutilizáveis, mas por enquanto vamos deixar nessa página mesmo.
 
 Aqui precisaremos de umas funções auxiliares, como uma `validadePasswordForm` para validar se as senhas estão iguais e se tem pelo menos 8 caracteres, se a senha nova e antiga não são as mesmas, etc. Mas a função mais importante será a `handlePasswordSubmit()`, que será chamada no click do botão de salvar, e é ela que vai chamar a função `changeUserPassword()` que definimos no nosso `utils/users.js`.
-
 
 ```javascript title="./next/pages/home.jsx" hl_lines="19 105-111 113-158 160-200 345-351 354-359 365-586"
 import { useEffect, useState } from "react";
