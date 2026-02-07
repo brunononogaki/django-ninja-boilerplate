@@ -85,6 +85,23 @@ O fluxo de autenticação funciona da seguinte forma:
 Para ativar esse plugin, precisaremos fazer algumas configurações no arquivo `settings.py`
 
 ```python title="./myapi/settings.py"
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
+# Detectar automaticamente se é produção ou desenvolvimento
+BACKEND_FQDN = config('BACKEND_FQDN', default='localhost:8000')
+IS_PRODUCTION = 'localhost' not in BACKEND_FQDN.lower()
+
+# Proxy reverso configuration (Traefik) - apenas em produção
+if IS_PRODUCTION:
+    USE_X_FORWARDED_HOST = True
+    USE_X_FORWARDED_PROTO = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+else:
+    USE_X_FORWARDED_HOST = False
+    USE_X_FORWARDED_PROTO = False
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -121,11 +138,6 @@ MIDDLEWARE = [
 
 # Permitir credenciais (cookies) em requisições CORS
 CORS_ALLOW_CREDENTIALS = True
-
-# Session cookie configuration
-SESSION_COOKIE_SECURE = False  # True em produção com HTTPS
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'  # Permite requisições cross-site POST
 
 # SITE_ID (required for allauth)
 SITE_ID = 1
@@ -234,7 +246,7 @@ GOOGLE_CLIENT_SECRET=XXXXXX
 
 ## Configurando no Django Admin
 
-Agora entre no Django Admin, entre no menu `Sites`, e altere o site default `example.com` para `localhost:3000` (se estiver no seu ambiente local de desenvolvimento, ou coloque o domínio real do site em produção.)
+Agora entre no Django Admin, entre no menu `Sites`, e altere o site default `example.com` para `localhost:8000` (se estiver no seu ambiente local de desenvolvimento, ou coloque o domínio real do backend em produção.)
 
 Agora vá para `Aplicativos Sociais` (ou `Social Application`), e adicione um novo. Tenha certeza que esse site está no ID 1 (é possível ver pela URL), porque ele tem que dar match com o valor que colocamos em SITE_ID do `settings.py`.
 
