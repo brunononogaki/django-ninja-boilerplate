@@ -184,3 +184,30 @@ def test_refresh_token_expired(client):
         # Should fail because refresh token is expired
         assert response.status_code == HTTPStatus.UNAUTHORIZED
         assert 'Invalid or expired refresh token' in response.json()['message']
+
+
+@pytest.mark.django_db
+def test_social_token_success(client):
+    """Test JWT generation for authenticated user via OAuth"""
+    User = get_user_model()
+    user = User.objects.create_user(username='google_user', email='google@example.com', password='testpass123')
+
+    # Login via sessão Django
+    client.login(username='google_user', password='testpass123')
+
+    # Chama endpoint social-token
+    response = client.post('/api/v1/social-token')
+
+    assert response.status_code == HTTPStatus.OK
+    data = response.json()
+    assert 'access_token' in data
+    assert 'refresh_token' in data
+    assert data['token_type'] == 'bearer'
+
+
+@pytest.mark.django_db
+def test_social_token_not_authenticated(client):
+    """Test JWT endpoint rejects unauthenticated users"""
+    response = client.post('/api/v1/social-token')
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED

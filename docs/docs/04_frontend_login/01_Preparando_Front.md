@@ -157,10 +157,16 @@ export async function apiCall(endpoint, options = {}) {
   }
 
   // Fazer requisição
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (err) {
+    console.error(`Erro de conexão ao fazer requisição para ${url}:`, err);
+    throw new Error(`Erro de conexão: ${err.message}`);
+  }
 
   // Se a resposta for vazia (204 No Content), retornar null
   if (response.status === 204) {
@@ -168,9 +174,22 @@ export async function apiCall(endpoint, options = {}) {
   }
 
   // Parsear JSON
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (err) {
+    console.error(`Erro ao fazer parse de JSON da resposta de ${url}:`, err);
+    throw new Error(`Erro ao processar resposta: ${response.statusText}`);
+  }
 
-  // Retornar dados sempre, sem importar se foi sucesso ou erro
+  // Se não foi sucesso (2xx), lançar erro com detalhes
+  if (!response.ok) {
+    const errorMessage = data?.message || response.statusText;
+    console.error(`Erro ${response.status} em ${url}:`, data);
+    throw new Error(`Erro ${response.status}: ${errorMessage}`);
+  }
+
+  // Retornar dados se foi sucesso
   return data;
 }
 ```

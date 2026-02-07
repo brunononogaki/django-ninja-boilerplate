@@ -78,3 +78,20 @@ def refresh(request, credentials: RefreshRequest):
     logger.info(f'User {user.username} (id={user.id}) refreshed token')
     tokens = create_token(user)
     return 200, {'token_type': 'bearer', **tokens}
+
+
+@router.post('social-token', tags=['Auth'], response=TokenResponse)
+def social_token(request):
+    """
+    Generate a JWT for the authenticated user via OAuth.
+    """
+    # Verifica se tem usuário autenticado (via sessão Django)
+    if not request.user.is_authenticated:
+        logger.warning(f'Attempt to get social token without authentication')
+        raise UnauthorizedError(message='User is not authenticated')
+
+    user = request.user
+    logger.info(f'User {user.username} (id={user.id}) requested social token')
+
+    tokens = create_token(user)
+    return 200, {'token_type': 'bearer', **tokens}
