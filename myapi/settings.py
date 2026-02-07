@@ -27,6 +27,20 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+# Detectar automaticamente se é produção ou desenvolvimento
+BACKEND_FQDN = config('BACKEND_FQDN', default='localhost:8000')
+IS_PRODUCTION = 'localhost' not in BACKEND_FQDN.lower()
+
+# Proxy reverso configuration (Traefik) - apenas em produção
+if IS_PRODUCTION:
+    USE_X_FORWARDED_HOST = True
+    USE_X_FORWARDED_PROTO = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+else:
+    USE_X_FORWARDED_HOST = False
+    USE_X_FORWARDED_PROTO = False
+
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
 # CSRF Configuration
