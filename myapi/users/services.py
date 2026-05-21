@@ -229,54 +229,31 @@ def send_password_reset_email(user, token_expiry_minutes=15):
         raise ServiceError('An error ocurred when sending the e-mail')
 
 
-def confirm_password_reset_token(token_id: str, is_resend: bool = False):
+def confirm_password_reset_token(token_id: str):
     """
-    Verify password reset token and reset password
+    Verify password reset token, mark it as used, and return the associated user.
 
-    Args:
-        token_id: Activation token ID (UUID)
-        is_resend: Check if this is a request for a new token or resend an expired one
-
-    Returns:
-        User instance if token is valid and not expired
-        None if token is invalid, expired, or already used
+    Raises ValidationError if token is not found, expired, or already used.
     """
     try:
-        # Find activation token by id
-        password_reset_token = PasswordResetToken.objects.get(
-            id=token_id,
-        )
+        password_reset_token = PasswordResetToken.objects.get(id=token_id)
     except PasswordResetToken.DoesNotExist:
         logger.warning(f'Attempt to change password with invalid token: token_id={token_id}')
         raise ValidationError('Password reset token not found')
 
-    # Get the associated user
     user = password_reset_token.user
 
-    # If requesting a new token, we don't need to check if it is expired or used, just return the user
-    if is_resend:
-        # Check if token is expired
-        if timezone.now() < password_reset_token.expires_at:
-            logger.warning(f'Attempt to resend password reset token with valid token: token_id={token_id}')
-            raise ValidationError('Token is still valid. Use the existing link to change your password')
-        return user
+    if timezone.now() > password_reset_token.expires_at:
+        logger.warning(f'Password reset token is expired: token_id={token_id}')
+        raise ValidationError('This link is expired, please request a new one')
 
-    else:
-        # Check if token is expired
-        if timezone.now() > password_reset_token.expires_at:
-            logger.warning(f'Password reset token is expired: token_id={token_id}')
-            raise ValidationError('This link is expired, please request a new one')
+    if password_reset_token.used_at is not None:
+        logger.warning(f'Password reset token already used for user {password_reset_token.user_id}')
+        raise ValidationError('This link was already used, please request a new one')
 
-        # Check if token is already used
-        if password_reset_token.used_at is not None:
-            logger.warning(f'Password reset token already used for user {password_reset_token.user_id}')
-            raise ValidationError('This link was already used, please request a new one')
-
-    # Mark token as used
     password_reset_token.used_at = timezone.now()
     password_reset_token.save()
 
-    # Token is valid, return user
     return user
 
 
