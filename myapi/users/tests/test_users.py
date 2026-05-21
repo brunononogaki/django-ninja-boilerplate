@@ -16,20 +16,23 @@ from myapi.users.models import PasswordResetToken
 
 
 @pytest.fixture
-def create_admin_access_token(client):
-    response = client.post(
+def admin_client(client):
+    """Cliente autenticado como admin. O cookie é setado automaticamente pelo login."""
+    client.post(
         '/api/v1/login',
         data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
         content_type='application/json',
     )
-    response_json = response.json()
-    access_token = response_json['access_token']
-    return access_token
+    return client
 
 
 @pytest.fixture
-def create_non_admin_access_token(client):
-    # Create new non-admin user
+def non_admin_client():
+    """Cliente autenticado como usuário não-admin. Usa instância própria de Client
+    para não conflitar com o admin_client quando ambos são usados no mesmo teste."""
+    from django.test import Client
+    c = Client()
+
     user_payload = {
         'username': 'new_user_non_admin',
         'first_name': 'New',
@@ -37,32 +40,28 @@ def create_non_admin_access_token(client):
         'email': 'user_new@admin.com',
         'password': 'myuserpassword',
     }
-    response = client.post(
+    c.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
     )
 
-    # Activate the user (he was created as inactive)
     User = get_user_model()
     user = User.objects.get(username='new_user_non_admin')
     user.is_active = True
     user.save()
 
-    # Get the auth token for the non-admin user
-    response = client.post(
+    c.post(
         '/api/v1/login',
         data=json.dumps({'username': 'new_user_non_admin', 'password': 'myuserpassword'}),
         content_type='application/json',
     )
-    response_json = response.json()
-    access_token = response_json['access_token']
-    return access_token
+    return c
 
 
 @pytest.mark.django_db
-def test_list_users(client, create_admin_access_token):
-    response = client.get('/api/v1/users', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
+def test_list_users(admin_client):
+    response = admin_client.get('/api/v1/users')
     data = response.json()
 
     assert response.status_code == HTTPStatus.OK
@@ -71,18 +70,18 @@ def test_list_users(client, create_admin_access_token):
 
 
 @pytest.mark.django_db
-def test_list_users_unauthorized(client, create_non_admin_access_token):
-    response = client.get('/api/v1/users', HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}')
+def test_list_users_unauthorized(non_admin_client):
+    response = non_admin_client.get('/api/v1/users')
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
 
 
 @pytest.mark.django_db
-def test_list_users_filter_by_id(client, create_admin_access_token):
+def test_list_users_filter_by_id(admin_client):
     User = get_user_model()
     admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
 
-    response = client.get(f'/api/v1/users?id={admin.id}', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
+    response = admin_client.get(f'/api/v1/users?id={admin.id}')
     data = response.json()
 
     assert response.status_code == HTTPStatus.OK
@@ -90,11 +89,8 @@ def test_list_users_filter_by_id(client, create_admin_access_token):
 
 
 @pytest.mark.django_db
-def test_list_users_filter_by_username(client, create_admin_access_token):
-    response = client.get(
-        f'/api/v1/users?username={config("DJANGO_ADMIN_USER")}',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
-    )
+def test_list_users_filter_by_username(admin_client):
+    response = admin_client.get(f'/api/v1/users?username={config("DJANGO_ADMIN_USER")}')
     data = response.json()
 
     assert response.status_code == HTTPStatus.OK
@@ -102,11 +98,11 @@ def test_list_users_filter_by_username(client, create_admin_access_token):
 
 
 @pytest.mark.django_db
-def test_get_user_detail_admin(client, create_admin_access_token):
+def test_get_user_detail_admin(admin_client):
     User = get_user_model()
     admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
 
-    response = client.get(f'/api/v1/users/{admin.id}', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
+    response = admin_client.get(f'/api/v1/users/{admin.id}')
     data = response.json()
 
     assert response.status_code == HTTPStatus.OK
@@ -114,11 +110,11 @@ def test_get_user_detail_admin(client, create_admin_access_token):
 
 
 @pytest.mark.django_db
-def test_get_user_detail_admin_to_other_user(client, create_admin_access_token, create_non_admin_access_token):
+def test_get_user_detail_admin_to_other_user(admin_client, non_admin_client):
     User = get_user_model()
     user = User.objects.get(username='new_user_non_admin')
 
-    response = client.get(f'/api/v1/users/{user.id}', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
+    response = admin_client.get(f'/api/v1/users/{user.id}')
     data = response.json()
 
     assert response.status_code == HTTPStatus.OK
@@ -126,11 +122,11 @@ def test_get_user_detail_admin_to_other_user(client, create_admin_access_token, 
 
 
 @pytest.mark.django_db
-def test_get_user_detail_user_to_himself_by_id(client, create_non_admin_access_token):
+def test_get_user_detail_user_to_himself_by_id(non_admin_client):
     User = get_user_model()
     user = User.objects.get(username='new_user_non_admin')
 
-    response = client.get(f'/api/v1/users/{user.id}', HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}')
+    response = non_admin_client.get(f'/api/v1/users/{user.id}')
     data = response.json()
 
     assert response.status_code == HTTPStatus.OK
@@ -138,19 +134,16 @@ def test_get_user_detail_user_to_himself_by_id(client, create_non_admin_access_t
 
 
 @pytest.mark.django_db
-def test_get_user_detail_user_to_other_user_fail(client, create_non_admin_access_token):
+def test_get_user_detail_user_to_other_user_fail(non_admin_client):
     User = get_user_model()
     user_admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
 
-    response = client.get(
-        f'/api/v1/users/{user_admin.id}', HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}'
-    )
+    response = non_admin_client.get(f'/api/v1/users/{user_admin.id}')
     assert response.status_code == HTTPStatus.UNAUTHORIZED
 
 
 @pytest.mark.django_db
 def test_create_users_success(client):
-    # Clear outbox
     mail.outbox = []
 
     user_payload = {
@@ -171,7 +164,6 @@ def test_create_users_success(client):
     assert response_json['username'] == user_payload['username']
     assert response_json['is_active'] == False
 
-    # Assert activation email was sent
     assert len(mail.outbox) == 1
     email = mail.outbox[0]
     assert email.subject == 'Ative sua conta'
@@ -181,7 +173,7 @@ def test_create_users_success(client):
 
 
 @pytest.mark.django_db
-def test_create_users_duplicated_username(client, create_admin_access_token):
+def test_create_users_duplicated_username(admin_client):
     user_payload = {
         'username': 'admin',
         'first_name': 'New',
@@ -189,17 +181,16 @@ def test_create_users_duplicated_username(client, create_admin_access_token):
         'email': 'admin_new@admin.com',
         'password': 'myadminpassword',
     }
-    response = client.post(
+    response = admin_client.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
     )
     assert response.status_code == HTTPStatus.CONFLICT
 
 
 @pytest.mark.django_db
-def test_create_users_duplicated_email(client, create_admin_access_token):
+def test_create_users_duplicated_email(admin_client):
     user_payload = {
         'username': 'admin_new',
         'first_name': 'New',
@@ -207,17 +198,16 @@ def test_create_users_duplicated_email(client, create_admin_access_token):
         'email': 'admin@admin.com',
         'password': 'myadminpassword',
     }
-    response = client.post(
+    response = admin_client.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
     )
     assert response.status_code == HTTPStatus.CONFLICT
 
 
 @pytest.mark.django_db
-def test_delete_user(client, create_admin_access_token):
+def test_delete_user(admin_client):
     user_payload = {
         'username': 'admin_new',
         'first_name': 'New',
@@ -225,49 +215,46 @@ def test_delete_user(client, create_admin_access_token):
         'email': 'admin_new@admin.com',
         'password': 'myadminpassword',
     }
-    response = client.post(
+    response = admin_client.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
     )
     user_id = response.json()['id']
 
-    response = client.delete(f'/api/v1/users/{user_id}', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
+    response = admin_client.delete(f'/api/v1/users/{user_id}')
     assert response.status_code == HTTPStatus.NO_CONTENT
 
 
 @pytest.mark.django_db
-def test_delete_user_admin_to_other_user(client, create_admin_access_token, create_non_admin_access_token):
+def test_delete_user_admin_to_other_user(admin_client, non_admin_client):
     User = get_user_model()
     user = User.objects.get(username='new_user_non_admin')
 
-    response = client.delete(f'/api/v1/users/{user.id}', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
+    response = admin_client.delete(f'/api/v1/users/{user.id}')
     assert response.status_code == HTTPStatus.NO_CONTENT
 
 
 @pytest.mark.django_db
-def test_delete_user_to_himself(client, create_non_admin_access_token):
+def test_delete_user_to_himself(non_admin_client):
     User = get_user_model()
     user = User.objects.get(username='new_user_non_admin')
 
-    response = client.delete(f'/api/v1/users/{user.id}', HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}')
+    response = non_admin_client.delete(f'/api/v1/users/{user.id}')
     assert response.status_code == HTTPStatus.NO_CONTENT
 
 
 @pytest.mark.django_db
-def test_delete_user_to_other_user_fail(client, create_non_admin_access_token):
+def test_delete_user_to_other_user_fail(non_admin_client):
     User = get_user_model()
     user_admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
 
-    response = client.delete(
-        f'/api/v1/users/{user_admin.id}', HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}'
-    )
+    response = non_admin_client.delete(f'/api/v1/users/{user_admin.id}')
     assert response.status_code == HTTPStatus.UNAUTHORIZED
 
 
 @pytest.mark.django_db
-def test_patch_user(client, create_admin_access_token):
+def test_patch_user(admin_client):
     user_payload = {
         'username': 'admin_new',
         'first_name': 'New',
@@ -275,11 +262,10 @@ def test_patch_user(client, create_admin_access_token):
         'email': 'admin_new@admin.com',
         'password': 'myadminpassword',
     }
-    response = client.post(
+    response = admin_client.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
     )
     user_id = response.json()['id']
 
@@ -288,11 +274,10 @@ def test_patch_user(client, create_admin_access_token):
         'email': 'newemail@admin.com',
     }
 
-    response = client.patch(
+    response = admin_client.patch(
         f'/api/v1/users/{user_id}',
         data=json.dumps(patch_data),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
     )
 
     response_json = response.json()
@@ -302,7 +287,7 @@ def test_patch_user(client, create_admin_access_token):
 
 
 @pytest.mark.django_db
-def test_patch_user_admin_to_other_user(client, create_admin_access_token, create_non_admin_access_token):
+def test_patch_user_admin_to_other_user(admin_client, non_admin_client):
     User = get_user_model()
     user = User.objects.get(username='new_user_non_admin')
 
@@ -311,10 +296,10 @@ def test_patch_user_admin_to_other_user(client, create_admin_access_token, creat
         'email': 'newemail@admin.com',
     }
 
-    response = client.patch(
+    response = admin_client.patch(
         f'/api/v1/users/{user.id}',
         data=json.dumps(patch_data),
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
+        content_type='application/json',
     )
     response_json = response.json()
     assert response.status_code == HTTPStatus.OK
@@ -323,7 +308,7 @@ def test_patch_user_admin_to_other_user(client, create_admin_access_token, creat
 
 
 @pytest.mark.django_db
-def test_patch_user_to_himself(client, create_non_admin_access_token):
+def test_patch_user_to_himself(non_admin_client):
     User = get_user_model()
     user = User.objects.get(username='new_user_non_admin')
 
@@ -332,10 +317,10 @@ def test_patch_user_to_himself(client, create_non_admin_access_token):
         'email': 'newemail@admin.com',
     }
 
-    response = client.patch(
+    response = non_admin_client.patch(
         f'/api/v1/users/{user.id}',
         data=json.dumps(patch_data),
-        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
+        content_type='application/json',
     )
     response_json = response.json()
     assert response.status_code == HTTPStatus.OK
@@ -344,7 +329,7 @@ def test_patch_user_to_himself(client, create_non_admin_access_token):
 
 
 @pytest.mark.django_db
-def test_patch_user_to_other_user_fail(client, create_non_admin_access_token):
+def test_patch_user_to_other_user_fail(non_admin_client):
     User = get_user_model()
     user_admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
 
@@ -353,16 +338,16 @@ def test_patch_user_to_other_user_fail(client, create_non_admin_access_token):
         'email': 'newemail@admin.com',
     }
 
-    response = client.patch(
+    response = non_admin_client.patch(
         f'/api/v1/users/{user_admin.id}',
         data=json.dumps(patch_data),
-        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
+        content_type='application/json',
     )
     assert response.status_code == HTTPStatus.UNAUTHORIZED
 
 
 @pytest.mark.django_db
-def test_change_password_success(client, create_non_admin_access_token):
+def test_change_password_success(non_admin_client):
     """Test successful password change"""
     User = get_user_model()
     user = User.objects.get(username='new_user_non_admin')
@@ -372,25 +357,23 @@ def test_change_password_success(client, create_non_admin_access_token):
         'new_password': 'mynewpassword',
     }
 
-    response = client.patch(
+    response = non_admin_client.patch(
         f'/api/v1/users/{user.id}/change-password',
         data=json.dumps(change_password_data),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
     )
 
     assert response.status_code == HTTPStatus.OK
     response_json = response.json()
     assert response_json['username'] == 'new_user_non_admin'
 
-    # Verify the password was actually changed
     user.refresh_from_db()
     assert user.check_password('mynewpassword')
     assert not user.check_password('myuserpassword')
 
 
 @pytest.mark.django_db
-def test_change_password_wrong_current_password(client, create_non_admin_access_token):
+def test_change_password_wrong_current_password(non_admin_client):
     """Test password change with wrong current password"""
     User = get_user_model()
     user = User.objects.get(username='new_user_non_admin')
@@ -400,25 +383,23 @@ def test_change_password_wrong_current_password(client, create_non_admin_access_
         'new_password': 'mynewpassword',
     }
 
-    response = client.patch(
+    response = non_admin_client.patch(
         f'/api/v1/users/{user.id}/change-password',
         data=json.dumps(change_password_data),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
     )
 
     assert response.status_code == HTTPStatus.BAD_REQUEST
     response_json = response.json()
     assert 'incorrect' in response_json['message'].lower()
 
-    # Verify password was NOT changed
     user.refresh_from_db()
     assert user.check_password('myuserpassword')
     assert not user.check_password('mynewpassword')
 
 
 @pytest.mark.django_db
-def test_change_password_admin_to_other_user(client, create_admin_access_token, create_non_admin_access_token):
+def test_change_password_admin_to_other_user(admin_client, non_admin_client):
     """Test that admin can change another user's password"""
     User = get_user_model()
     user = User.objects.get(username='new_user_non_admin')
@@ -428,22 +409,20 @@ def test_change_password_admin_to_other_user(client, create_admin_access_token, 
         'new_password': 'adminchangedpassword',
     }
 
-    response = client.patch(
+    response = admin_client.patch(
         f'/api/v1/users/{user.id}/change-password',
         data=json.dumps(change_password_data),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
     )
 
     assert response.status_code == HTTPStatus.OK
 
-    # Verify the password was changed
     user.refresh_from_db()
     assert user.check_password('adminchangedpassword')
 
 
 @pytest.mark.django_db
-def test_change_password_user_to_other_user_fail(client, create_non_admin_access_token):
+def test_change_password_user_to_other_user_fail(non_admin_client):
     """Test that non-admin user cannot change another user's password"""
     User = get_user_model()
     user_admin = User.objects.get(username=config('DJANGO_ADMIN_USER'))
@@ -453,16 +432,14 @@ def test_change_password_user_to_other_user_fail(client, create_non_admin_access
         'new_password': 'newevilpassword',
     }
 
-    response = client.patch(
+    response = non_admin_client.patch(
         f'/api/v1/users/{user_admin.id}/change-password',
         data=json.dumps(change_password_data),
         content_type='application/json',
-        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
     )
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
 
-    # Verify admin password was NOT changed
     user_admin.refresh_from_db()
     assert user_admin.check_password(config('DJANGO_ADMIN_PASSWORD'))
     assert not user_admin.check_password('newevilpassword')
@@ -471,7 +448,6 @@ def test_change_password_user_to_other_user_fail(client, create_non_admin_access
 @pytest.mark.django_db
 def test_activate_user_success(client):
     """Test successful user account activation"""
-    # Create a user
     user_payload = {
         'username': 'activate_test',
         'first_name': 'Activate',
@@ -486,27 +462,21 @@ def test_activate_user_success(client):
     )
     user_created = response.json()
 
-    # User should be inactive
     assert user_created['is_active'] is False
 
-    # Get the activation token from email
     assert len(mail.outbox) == 1
     email = mail.outbox[0]
     match = re.search(r'/activate/([0-9a-fA-F-]{36})', email.body)
     activation_token_from_email = match.group(1) if match else None
     assert activation_token_from_email is not None, 'Activation token not found in email body'
 
-    # Activate the user
-    response = client.patch(
-        f'/api/v1/users/activate/{activation_token_from_email}',
-    )
+    response = client.patch(f'/api/v1/users/activate/{activation_token_from_email}')
     user_activated = response.json()
 
     assert response.status_code == HTTPStatus.OK
     assert user_activated['username'] == 'activate_test'
     assert user_activated['is_active'] is True
 
-    # Check that token is marked as used
     activation_token = ActivationToken.objects.get(id=activation_token_from_email)
     assert activation_token.used_at is not None
 
@@ -514,18 +484,14 @@ def test_activate_user_success(client):
 @pytest.mark.django_db
 def test_activate_user_invalid_token(client):
     """Test activation with invalid token"""
-    # Try to activate with non-existent IDs
     token_id = uuid.uuid4()
-
     response = client.patch(f'/api/v1/users/activate/{token_id}')
-
     assert response.status_code == HTTPStatus.BAD_REQUEST
 
 
 @pytest.mark.django_db
 def test_activate_user_already_used_token(client):
     """Test successful user account activation"""
-    # Create a user
     user_payload = {
         'username': 'activate_test',
         'first_name': 'Activate',
@@ -540,45 +506,33 @@ def test_activate_user_already_used_token(client):
     )
     user_created = response.json()
 
-    # User should be inactive
     assert user_created['is_active'] is False
 
-    # Get the activation token from email
     assert len(mail.outbox) == 1
     email = mail.outbox[0]
     match = re.search(r'/activate/([0-9a-fA-F-]{36})', email.body)
     activation_token_from_email = match.group(1) if match else None
     assert activation_token_from_email is not None, 'Activation token not found in email body'
 
-    # Activate the user
-    response = client.patch(
-        f'/api/v1/users/activate/{activation_token_from_email}',
-    )
+    response = client.patch(f'/api/v1/users/activate/{activation_token_from_email}')
     user_activated = response.json()
 
     assert response.status_code == HTTPStatus.OK
     assert user_activated['username'] == 'activate_test'
     assert user_activated['is_active'] is True
 
-    # Check that token is marked as used
     activation_token = ActivationToken.objects.get(id=activation_token_from_email)
     assert activation_token.used_at is not None
 
-    # Activate the user again
-    response = client.patch(
-        f'/api/v1/users/activate/{activation_token_from_email}',
-    )
+    response = client.patch(f'/api/v1/users/activate/{activation_token_from_email}')
     assert response.status_code == HTTPStatus.BAD_REQUEST
 
 
 @pytest.mark.django_db
 def test_activate_user_expired_token(client):
     """Test activation with expired token"""
-
-    # Get current time
     now = timezone.now()
 
-    # Create user at current time
     with freeze_time(now):
         user_payload = {
             'username': 'expire_test',
@@ -594,14 +548,11 @@ def test_activate_user_expired_token(client):
         )
         user_id = response.json()['id']
 
-        # Get the activation token
         User = get_user_model()
         user = User.objects.get(id=user_id)
         activation_token = ActivationToken.objects.get(user=user)
 
-    # Move 16 minutes to the future
     with freeze_time(now + timedelta(minutes=16)):
-        # Try to activate with expired token
         response = client.patch(
             f'/api/v1/users/activate/{activation_token.id}',
             content_type='application/json',
@@ -609,7 +560,6 @@ def test_activate_user_expired_token(client):
 
         assert response.status_code == HTTPStatus.BAD_REQUEST
 
-        # User should still be inactive
         user.refresh_from_db()
         assert user.is_active is False
 
@@ -617,13 +567,9 @@ def test_activate_user_expired_token(client):
 @pytest.mark.django_db
 def test_resend_activation_success(client):
     """Test successful resend of activation token with expired token"""
-    # Clear outbox
     mail.outbox = []
-
-    # Get current time
     now = timezone.now()
 
-    # Create user at current time
     with freeze_time(now):
         user_payload = {
             'username': 'resend_test',
@@ -639,25 +585,20 @@ def test_resend_activation_success(client):
         )
         user_id = response.json()['id']
 
-        # Get the activation token
         User = get_user_model()
         user = User.objects.get(id=user_id)
         old_activation_token = ActivationToken.objects.get(user=user)
         old_token_id = str(old_activation_token.id)
 
-        # Clear outbox to get only the resend email
         mail.outbox = []
 
-    # Move 16 minutes to the future (token expired)
     with freeze_time(now + timedelta(minutes=16)):
-        # Try to activate with expired token - should fail
         response = client.patch(
             f'/api/v1/users/activate/{old_token_id}',
             content_type='application/json',
         )
         assert response.status_code == HTTPStatus.BAD_REQUEST
 
-        # Request a new activation token
         response = client.post(
             f'/api/v1/users/resend-activation/{old_token_id}',
             content_type='application/json',
@@ -668,28 +609,23 @@ def test_resend_activation_success(client):
         assert response_json['username'] == 'resend_test'
         assert response_json['is_active'] is False
 
-        # Check that a new activation email was sent
         assert len(mail.outbox) == 1
         email = mail.outbox[0]
         assert email.subject == 'Ative sua conta'
         assert 'resend@test.com' in email.to
 
-        # Extract the new token from the email
         match = re.search(r'/activate/([0-9a-fA-F-]{36})', email.body)
         new_activation_token_id = match.group(1) if match else None
         assert new_activation_token_id is not None, 'New activation token not found in email body'
 
-        # Verify the new token is different from the old one
         assert new_activation_token_id != old_token_id
 
-        # Try to activate with the old token - should still fail
         response = client.patch(
             f'/api/v1/users/activate/{old_token_id}',
             content_type='application/json',
         )
         assert response.status_code == HTTPStatus.BAD_REQUEST
 
-        # Activate with the new token - should succeed
         response = client.patch(
             f'/api/v1/users/activate/{new_activation_token_id}',
             content_type='application/json',
@@ -704,10 +640,8 @@ def test_resend_activation_success(client):
 @pytest.mark.django_db
 def test_resend_activation_with_valid_token(client):
     """Test that resend fails when token is still valid"""
-    # Get current time
     now = timezone.now()
 
-    # Create user
     with freeze_time(now):
         user_payload = {
             'username': 'valid_token_test',
@@ -723,12 +657,10 @@ def test_resend_activation_with_valid_token(client):
         )
         user_id = response.json()['id']
 
-        # Get the activation token
         User = get_user_model()
         user = User.objects.get(id=user_id)
         activation_token = ActivationToken.objects.get(user=user)
 
-    # Try to resend while token is still valid - should fail
     with freeze_time(now + timedelta(minutes=5)):
         response = client.post(
             f'/api/v1/users/resend-activation/{activation_token.id}',
@@ -741,10 +673,8 @@ def test_resend_activation_with_valid_token(client):
 @pytest.mark.django_db
 def test_resend_activation_with_already_used_token(client):
     """Test that resend fails when token has already been used"""
-    # Get current time
     now = timezone.now()
 
-    # Create user
     with freeze_time(now):
         user_payload = {
             'username': 'used_token_test',
@@ -760,21 +690,17 @@ def test_resend_activation_with_already_used_token(client):
         )
         user_id = response.json()['id']
 
-        # Get the activation token
         User = get_user_model()
         user = User.objects.get(id=user_id)
         activation_token = ActivationToken.objects.get(user=user)
 
-        # Extract token from email and activate user
         assert len(mail.outbox) == 1
         email = mail.outbox[0]
         match = re.search(r'/activate/([0-9a-fA-F-]{36})', email.body)
         token_from_email = match.group(1) if match else None
 
-        # Activate the user
         client.patch(f'/api/v1/users/activate/{token_from_email}')
 
-    # Move time forward so token is expired and already used
     with freeze_time(now + timedelta(minutes=16)):
         response = client.post(
             f'/api/v1/users/resend-activation/{activation_token.id}',
@@ -787,10 +713,8 @@ def test_resend_activation_with_already_used_token(client):
 @pytest.mark.django_db
 def test_resend_activation_with_already_active_user(client):
     """Test that resend fails when user is already activated"""
-    # Get current time
     now = timezone.now()
 
-    # Create user and immediately activate
     with freeze_time(now):
         user_payload = {
             'username': 'already_active_test',
@@ -806,22 +730,18 @@ def test_resend_activation_with_already_active_user(client):
         )
         user_id = response.json()['id']
 
-        # Get the activation token
         User = get_user_model()
         user = User.objects.get(id=user_id)
         activation_token = ActivationToken.objects.get(user=user)
 
-        # Extract token from email and activate user
         assert len(mail.outbox) == 1
         email = mail.outbox[0]
         match = re.search(r'/activate/([0-9a-fA-F-]{36})', email.body)
         token_from_email = match.group(1) if match else None
 
-        # Activate the user
         response = client.patch(f'/api/v1/users/activate/{token_from_email}')
         assert response.status_code == HTTPStatus.OK
 
-    # Move time forward and try to resend
     with freeze_time(now + timedelta(minutes=16)):
         response = client.post(
             f'/api/v1/users/resend-activation/{activation_token.id}',
@@ -845,12 +765,9 @@ def test_resend_activation_invalid_token(client):
 
 
 @pytest.mark.django_db
-def test_get_current_user_admin(client, create_admin_access_token):
+def test_get_current_user_admin(admin_client):
     """Test that admin can get their own profile"""
-    response = client.get(
-        '/api/v1/me',
-        HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}',
-    )
+    response = admin_client.get('/api/v1/me')
     data = response.json()
 
     assert response.status_code == HTTPStatus.OK
@@ -860,12 +777,9 @@ def test_get_current_user_admin(client, create_admin_access_token):
 
 
 @pytest.mark.django_db
-def test_get_current_user_non_admin(client, create_non_admin_access_token):
+def test_get_current_user_non_admin(non_admin_client):
     """Test that non-admin user can get their own profile"""
-    response = client.get(
-        '/api/v1/me',
-        HTTP_AUTHORIZATION=f'Bearer {create_non_admin_access_token}',
-    )
+    response = non_admin_client.get('/api/v1/me')
     data = response.json()
 
     assert response.status_code == HTTPStatus.OK
@@ -880,7 +794,6 @@ def test_get_current_user_non_admin(client, create_non_admin_access_token):
 @pytest.mark.django_db
 def test_request_password_reset_success(client):
     """Test successful password reset request"""
-    # Create a user
     user_payload = {
         'username': 'reset_test',
         'first_name': 'Reset',
@@ -895,10 +808,8 @@ def test_request_password_reset_success(client):
     )
     assert response.status_code == HTTPStatus.CREATED
 
-    # Clear mailbox
     mail.outbox.clear()
 
-    # Request password reset
     reset_payload = {'email': 'reset@test.com'}
     response = client.post(
         '/api/v1/users/password-reset/request',
@@ -922,18 +833,14 @@ def test_request_password_reset_non_existent_email(client):
     )
     data = response.json()
 
-    # Should return same message for security (no email enumeration)
     assert response.status_code == HTTPStatus.OK
     assert 'message' in data
-    # Should not send email
     assert len(mail.outbox) == 0
 
 
 @pytest.mark.django_db
 def test_confirm_password_reset_success(client):
     """Test successful password reset confirmation"""
-
-    # Create and activate a user
     user_payload = {
         'username': 'reset_confirm_test',
         'first_name': 'Reset',
@@ -941,7 +848,7 @@ def test_confirm_password_reset_success(client):
         'email': 'resetconfirm@test.com',
         'password': 'testpassword',
     }
-    response = client.post(
+    client.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
@@ -951,13 +858,11 @@ def test_confirm_password_reset_success(client):
     user.is_active = True
     user.save()
 
-    # Create a password reset token
     reset_token = PasswordResetToken.objects.create(
         user=user,
         expires_at=timezone.now() + timedelta(minutes=15),
     )
 
-    # Confirm password reset
     new_password_payload = {'new_password': 'newpassword123'}
     response = client.post(
         f'/api/v1/users/password-reset/{reset_token.id}/confirm',
@@ -967,11 +872,9 @@ def test_confirm_password_reset_success(client):
 
     assert response.status_code == HTTPStatus.OK
 
-    # Check that password was changed
     user.refresh_from_db()
     assert user.check_password('newpassword123')
 
-    # Check that token is marked as used
     reset_token.refresh_from_db()
     assert reset_token.used_at is not None
 
@@ -979,7 +882,6 @@ def test_confirm_password_reset_success(client):
 @pytest.mark.django_db
 def test_confirm_password_reset_invalid_token(client):
     """Test password reset confirmation with invalid token"""
-    # Try to confirm with non-existent token
     token_id = uuid.uuid4()
     new_password_payload = {'new_password': 'newpassword123'}
 
@@ -995,8 +897,6 @@ def test_confirm_password_reset_invalid_token(client):
 @pytest.mark.django_db
 def test_confirm_password_reset_expired_token(client):
     """Test password reset confirmation with expired token"""
-
-    # Create and activate a user
     user_payload = {
         'username': 'reset_expire_test',
         'first_name': 'Reset',
@@ -1004,7 +904,7 @@ def test_confirm_password_reset_expired_token(client):
         'email': 'resetexpire@test.com',
         'password': 'testpassword',
     }
-    response = client.post(
+    client.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
@@ -1014,17 +914,14 @@ def test_confirm_password_reset_expired_token(client):
     user.is_active = True
     user.save()
 
-    # Get current time
     now = timezone.now()
 
-    # Create an expired password reset token
     with freeze_time(now - timedelta(minutes=20)):
         reset_token = PasswordResetToken.objects.create(
             user=user,
-            expires_at=now - timedelta(minutes=5),  # Already expired
+            expires_at=now - timedelta(minutes=5),
         )
 
-    # Try to confirm with expired token
     new_password_payload = {'new_password': 'newpassword123'}
     response = client.post(
         f'/api/v1/users/password-reset/{reset_token.id}/confirm',
@@ -1038,8 +935,6 @@ def test_confirm_password_reset_expired_token(client):
 @pytest.mark.django_db
 def test_confirm_password_reset_already_used_token(client):
     """Test password reset confirmation with already used token"""
-
-    # Create and activate a user
     user_payload = {
         'username': 'reset_used_test',
         'first_name': 'Reset',
@@ -1047,7 +942,7 @@ def test_confirm_password_reset_already_used_token(client):
         'email': 'resetused@test.com',
         'password': 'testpassword',
     }
-    response = client.post(
+    client.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
@@ -1057,14 +952,12 @@ def test_confirm_password_reset_already_used_token(client):
     user.is_active = True
     user.save()
 
-    # Create a password reset token and mark as used
     reset_token = PasswordResetToken.objects.create(
         user=user,
         expires_at=timezone.now() + timedelta(minutes=15),
         used_at=timezone.now(),
     )
 
-    # Try to confirm with already used token
     new_password_payload = {'new_password': 'newpassword123'}
     response = client.post(
         f'/api/v1/users/password-reset/{reset_token.id}/confirm',
@@ -1078,8 +971,6 @@ def test_confirm_password_reset_already_used_token(client):
 @pytest.mark.django_db
 def test_validate_password_reset_token_success(client):
     """Test successful password reset token validation"""
-
-    # Create and activate a user
     user_payload = {
         'username': 'validate_test',
         'first_name': 'Validate',
@@ -1087,7 +978,7 @@ def test_validate_password_reset_token_success(client):
         'email': 'validate@test.com',
         'password': 'testpassword',
     }
-    response = client.post(
+    client.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
@@ -1095,13 +986,11 @@ def test_validate_password_reset_token_success(client):
     User = get_user_model()
     user = User.objects.get(username='validate_test')
 
-    # Create a valid password reset token
     reset_token = PasswordResetToken.objects.create(
         user=user,
         expires_at=timezone.now() + timedelta(minutes=15),
     )
 
-    # Validate token
     response = client.get(f'/api/v1/users/password-reset/{reset_token.id}/validate')
     data = response.json()
 
@@ -1126,8 +1015,6 @@ def test_validate_password_reset_token_invalid(client):
 @pytest.mark.django_db
 def test_validate_password_reset_token_expired(client):
     """Test validation with expired token"""
-
-    # Create and activate a user
     user_payload = {
         'username': 'validate_expire_test',
         'first_name': 'Validate',
@@ -1135,7 +1022,7 @@ def test_validate_password_reset_token_expired(client):
         'email': 'validateexpire@test.com',
         'password': 'testpassword',
     }
-    response = client.post(
+    client.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
@@ -1143,17 +1030,14 @@ def test_validate_password_reset_token_expired(client):
     User = get_user_model()
     user = User.objects.get(username='validate_expire_test')
 
-    # Get current time
     now = timezone.now()
 
-    # Create an expired password reset token
     with freeze_time(now - timedelta(minutes=20)):
         reset_token = PasswordResetToken.objects.create(
             user=user,
-            expires_at=now - timedelta(minutes=5),  # Already expired
+            expires_at=now - timedelta(minutes=5),
         )
 
-    # Try to validate expired token
     response = client.get(f'/api/v1/users/password-reset/{reset_token.id}/validate')
     data = response.json()
 
@@ -1165,8 +1049,6 @@ def test_validate_password_reset_token_expired(client):
 @pytest.mark.django_db
 def test_validate_password_reset_token_already_used(client):
     """Test validation with already used token"""
-
-    # Create and activate a user
     user_payload = {
         'username': 'validate_used_test',
         'first_name': 'Validate',
@@ -1174,7 +1056,7 @@ def test_validate_password_reset_token_already_used(client):
         'email': 'validateused@test.com',
         'password': 'testpassword',
     }
-    response = client.post(
+    client.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
@@ -1182,14 +1064,12 @@ def test_validate_password_reset_token_already_used(client):
     User = get_user_model()
     user = User.objects.get(username='validate_used_test')
 
-    # Create a password reset token and mark as used
     reset_token = PasswordResetToken.objects.create(
         user=user,
         expires_at=timezone.now() + timedelta(minutes=15),
         used_at=timezone.now(),
     )
 
-    # Try to validate already used token
     response = client.get(f'/api/v1/users/password-reset/{reset_token.id}/validate')
     data = response.json()
 

@@ -1,20 +1,15 @@
-import uuid
 from datetime import datetime
 from http import HTTPStatus
 
 from django.contrib.auth import authenticate
 from django.db import connection
+from django.http import HttpResponse
 from loguru import logger
 from ninja import Router
 
-from .auth import create_token, verify_refresh_token
+from .auth import clear_auth_cookies, create_token, set_auth_cookies, verify_refresh_token
 from .exceptions import ServiceError, UnauthorizedError
-from .schemas import (
-    LoginRequest,
-    RefreshRequest,
-    StatusSchema,
-    TokenResponse,
-)
+from .schemas import LoginRequest, MessageSchema, StatusSchema
 
 router = Router(tags=['Admin'])
 
@@ -31,15 +26,12 @@ router = Router(tags=['Admin'])
 def status(request):
     try:
         with connection.cursor() as cursor:
-            # Database version
             cursor.execute('SELECT version()')
             db_version = cursor.fetchone()[0]
 
-            # Maximum number of connections
             cursor.execute('SHOW max_connections')
             max_connections = int(cursor.fetchone()[0])
 
-            # Active connections
             cursor.execute('SELECT count(*) FROM pg_stat_activity')
             active_connections = int(cursor.fetchone()[0])
 
@@ -57,41 +49,48 @@ def status(request):
 ##############
 # AUTH
 ##############
-@router.post('login', tags=['Auth'], response=TokenResponse)
-def login(request, credentials: LoginRequest):
+@router.post('login', tags=['Auth'], response={200: MessageSchema})
+def login(request, response: HttpResponse, credentials: LoginRequest):
     user = authenticate(username=credentials.username, password=credentials.password)
     if not user:
         logger.warning(f'Failed login attempt for username: {credentials.username}')
         raise UnauthorizedError()
     logger.info(f'User {user.username} (id={user.id}) logged in')
     tokens = create_token(user)
-    return 200, {'token_type': 'bearer', **tokens}
+    set_auth_cookies(response, tokens)
+    return 200, {'message': 'Login realizado com sucesso'}
 
 
-@router.post('refresh', tags=['Auth'], response=TokenResponse)
-def refresh(request, credentials: RefreshRequest):
-    """Refresh access token using a valid refresh token"""
-    user = verify_refresh_token(credentials.refresh_token)
+@router.post('refresh', tags=['Auth'], response={200: MessageSchema})
+def refresh(request, response: HttpResponse):
+    refresh_token = request.COOKIES.get('refresh_token')
+    if not refresh_token:
+        raise UnauthorizedError(message='Refresh token não encontrado')
+    user = verify_refresh_token(refresh_token)
     if not user:
-        logger.warning(f'Failed refresh attempt with invalid refresh token')
+        logger.warning('Failed refresh attempt with invalid refresh token')
         raise UnauthorizedError(message='Invalid or expired refresh token')
     logger.info(f'User {user.username} (id={user.id}) refreshed token')
     tokens = create_token(user)
-    return 200, {'token_type': 'bearer', **tokens}
+    set_auth_cookies(response, tokens)
+    return 200, {'message': 'Token renovado com sucesso'}
 
 
-@router.post('social-token', tags=['Auth'], response=TokenResponse)
-def social_token(request):
-    """
-    Generate a JWT for the authenticated user via OAuth.
-    """
-    # Verifica se tem usuário autenticado (via sessão Django)
+@router.post('logout', tags=['Auth'], response={200: MessageSchema})
+def logout(request, response: HttpResponse):
+    clear_auth_cookies(response)
+    logger.info('User logged out')
+    return 200, {'message': 'Logout realizado com sucesso'}
+
+
+@router.post('social-token', tags=['Auth'], response={200: MessageSchema})
+def social_token(request, response: HttpResponse):
+    """Generate a JWT for the authenticated user via OAuth."""
     if not request.user.is_authenticated:
-        logger.warning(f'Attempt to get social token without authentication')
+        logger.warning('Attempt to get social token without authentication')
         raise UnauthorizedError(message='User is not authenticated')
-
     user = request.user
     logger.info(f'User {user.username} (id={user.id}) requested social token')
-
     tokens = create_token(user)
-    return 200, {'token_type': 'bearer', **tokens}
+    set_auth_cookies(response, tokens)
+    return 200, {'message': 'Token gerado com sucesso'}

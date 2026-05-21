@@ -13,11 +13,5 @@ class LoginRequest(Schema):
     password: str
 
 
-class RefreshRequest(Schema):
-    refresh_token: str
-
-
-class TokenResponse(Schema):
-    access_token: str
-    refresh_token: str | None = None
-    token_type: str = 'bearer'
+class MessageSchema(Schema):
+    message: str

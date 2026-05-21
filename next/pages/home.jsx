@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { getToken, logoutUser } from "utils/auth";
+import { isAuthenticated, logoutUser } from "utils/auth";
 import { getCurrentUser, updateUser, changeUserPassword } from "utils/users";
 
 export default function Home() {
@@ -20,7 +20,7 @@ export default function Home() {
 
   useEffect(() => {
     // Verifica se o usuário está autenticado
-    if (!getToken()) {
+    if (!isAuthenticated()) {
       router.push("/");
       return;
     }
@@ -56,8 +56,8 @@ export default function Home() {
     fetchUser();
   }, [router]);
 
-  const handleLogout = () => {
-    logoutUser();
+  const handleLogout = async () => {
+    await logoutUser();
     router.push("/");
   };
 

@@ -18,18 +18,17 @@ def test_login_success(client):
         data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
         content_type='application/json',
     )
-    data = response.json()
     assert response.status_code == HTTPStatus.OK
-    assert 'access_token' in data
-    assert data['token_type'] == 'bearer'
-    assert 'refresh_token' in data
+    assert 'access_token' in response.cookies
+    assert 'refresh_token' in response.cookies
+    assert 'is_logged_in' in response.cookies
+    assert response.cookies['access_token']['httponly']
+    assert response.cookies['refresh_token']['httponly']
+    assert not response.cookies['is_logged_in']['httponly']
 
 
 @pytest.mark.django_db
 def test_login_active_user(client):
-    """Test that active users can login"""
-
-    # Create a new user
     user_payload = {
         'username': 'active_user',
         'first_name': 'Active',
@@ -44,30 +43,22 @@ def test_login_active_user(client):
     )
     assert response.status_code == HTTPStatus.CREATED
 
-    # Activate User
-    User = get_user_model()
     user = User.objects.get(username='active_user')
     user.is_active = True
     user.save()
 
-    # Try to login with inactive user
     response = client.post(
         '/api/v1/login',
         data=json.dumps({'username': 'active_user', 'password': 'testpassword'}),
         content_type='application/json',
     )
-
-    data = response.json()
     assert response.status_code == HTTPStatus.OK
-    assert 'access_token' in data
-    assert data['token_type'] == 'bearer'
-    assert 'refresh_token' in data
+    assert 'access_token' in response.cookies
+    assert 'refresh_token' in response.cookies
 
 
 @pytest.mark.django_db
 def test_login_inactive_user(client):
-    """Test that inactive users cannot login"""
-    # Create a new user (created as inactive by default)
     user_payload = {
         'username': 'inactive_user',
         'first_name': 'Inactive',
@@ -75,22 +66,19 @@ def test_login_inactive_user(client):
         'email': 'inactive@test.com',
         'password': 'testpassword',
     }
-    response = client.post(
+    client.post(
         '/api/v1/users',
         data=json.dumps(user_payload),
         content_type='application/json',
     )
-    assert response.status_code == HTTPStatus.CREATED
 
-    # Try to login with inactive user
     response = client.post(
         '/api/v1/login',
         data=json.dumps({'username': 'inactive_user', 'password': 'testpassword'}),
         content_type='application/json',
     )
-
-    # Should return 403 Forbidden
     assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert 'access_token' not in response.cookies
 
 
 @pytest.mark.django_db
@@ -100,9 +88,9 @@ def test_login_invalid_credentials(client):
         data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': 'wrongpassword'}),
         content_type='application/json',
     )
-    data = response.json()
     assert response.status_code == HTTPStatus.UNAUTHORIZED
-    assert data['message'] == 'Invalid credentials.'
+    assert response.json()['message'] == 'Invalid credentials.'
+    assert 'access_token' not in response.cookies
 
 
 @pytest.mark.django_db
@@ -116,98 +104,92 @@ def test_login_missing_fields(client):
 
 
 @pytest.mark.django_db
-def test_refresh_token_success(client):
-    """Test refreshing access token before it expires"""
-    # Capture the initial time as reference
-    initial_time = timezone.now()
-
-    # Step 1: Login and get tokens
-    response = client.post(
+def test_logout_clears_cookies(client):
+    client.post(
         '/api/v1/login',
         data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
         content_type='application/json',
     )
-    data = response.json()
-    access_token_1 = data['access_token']
-    refresh_token = data['refresh_token']
+    response = client.post('/api/v1/logout')
     assert response.status_code == HTTPStatus.OK
+    assert response.cookies['access_token']['max-age'] == 0
+    assert response.cookies['refresh_token']['max-age'] == 0
+    assert response.cookies['is_logged_in']['max-age'] == 0
 
-    # Step 2: Advance 14 minutes (access token expires in 15)
+
+@pytest.mark.django_db
+def test_refresh_token_success(client):
+    initial_time = timezone.now()
+
+    client.post(
+        '/api/v1/login',
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
+    )
+
     with freeze_time(initial_time + timedelta(minutes=14)):
-        # Step 3: Call refresh endpoint
-        response = client.post(
-            '/api/v1/refresh',
-            data=json.dumps({'refresh_token': refresh_token}),
-            content_type='application/json',
-        )
-        data = response.json()
-        access_token_2 = data['access_token']
-
-        # Step 4: Verify we got a new token (different from the first)
+        # O cliente de testes guarda os cookies do login e os envia automaticamente
+        response = client.post('/api/v1/refresh')
         assert response.status_code == HTTPStatus.OK
-        assert 'access_token' in data
-        assert access_token_1 != access_token_2  # Token deve ser diferente
-        assert data['token_type'] == 'bearer'
+        assert 'access_token' in response.cookies
 
-        # Step 5: Advance more 10 minutes (total 24 minutes from start)
-        # Old access_token_1 should be expired, but access_token_2 should be valid
         with freeze_time(initial_time + timedelta(minutes=24)):
-            # Try to use access_token_2 (should still work)
-            response = client.get(
-                '/api/v1/users',
-                HTTP_AUTHORIZATION=f'Bearer {access_token_2}',
-            )
-            # Should work because token_2 is fresh and only 10 minutes old
+            # Acessa endpoint protegido com o novo cookie
+            response = client.get('/api/v1/me')
             assert response.status_code == HTTPStatus.OK
 
 
 @pytest.mark.django_db
 def test_refresh_token_expired(client):
-    """Test that expired refresh tokens are rejected"""
-    # Login to get tokens
-    response = client.post(
+    client.post(
         '/api/v1/login',
         data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
         content_type='application/json',
     )
-    data = response.json()
-    refresh_token = data['refresh_token']
 
-    # Advance 31 days (refresh token expires in 30)
     with freeze_time(timezone.now() + timedelta(days=31)):
-        response = client.post(
-            '/api/v1/refresh',
-            data=json.dumps({'refresh_token': refresh_token}),
-            content_type='application/json',
-        )
-
-        # Should fail because refresh token is expired
+        response = client.post('/api/v1/refresh')
         assert response.status_code == HTTPStatus.UNAUTHORIZED
         assert 'Invalid or expired refresh token' in response.json()['message']
 
 
 @pytest.mark.django_db
-def test_social_token_success(client):
-    """Test JWT generation for authenticated user via OAuth"""
-    User = get_user_model()
-    user = User.objects.create_user(username='google_user', email='google@example.com', password='testpass123')
+def test_refresh_token_without_cookie(client):
+    response = client.post('/api/v1/refresh')
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
 
-    # Login via sessão Django
+
+@pytest.mark.django_db
+def test_protected_endpoint_with_cookie(client):
+    client.post(
+        '/api/v1/login',
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
+    )
+    response = client.get('/api/v1/me')
+    assert response.status_code == HTTPStatus.OK
+
+
+@pytest.mark.django_db
+def test_protected_endpoint_without_cookie(client):
+    response = client.get('/api/v1/me')
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.django_db
+def test_social_token_success(client):
+    user = User.objects.create_user(username='google_user', email='google@example.com', password='testpass123')
     client.login(username='google_user', password='testpass123')
 
-    # Chama endpoint social-token
     response = client.post('/api/v1/social-token')
 
     assert response.status_code == HTTPStatus.OK
-    data = response.json()
-    assert 'access_token' in data
-    assert 'refresh_token' in data
-    assert data['token_type'] == 'bearer'
+    assert 'access_token' in response.cookies
+    assert 'refresh_token' in response.cookies
+    assert 'is_logged_in' in response.cookies
 
 
 @pytest.mark.django_db
 def test_social_token_not_authenticated(client):
-    """Test JWT endpoint rejects unauthenticated users"""
     response = client.post('/api/v1/social-token')
-
     assert response.status_code == HTTPStatus.UNAUTHORIZED

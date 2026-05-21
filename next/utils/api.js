@@ -33,18 +33,13 @@ export async function apiCall(endpoint, options = {}) {
     ...options.headers,
   };
 
-  // Adicionar token JWT se existir
-  const token = localStorage.getItem("access_token");
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  // Fazer requisição
+  // Fazer requisição — credentials: 'include' envia os cookies automaticamente
   let response;
   try {
     response = await fetch(url, {
       ...options,
       headers,
+      credentials: "include",
     });
   } catch (err) {
     console.error(`Erro de conexão ao fazer requisição para ${url}:`, err);
