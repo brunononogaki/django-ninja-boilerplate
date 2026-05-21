@@ -184,3 +184,7 @@ node_modules
 # Claude Code
 .claude/
 .agent/
+
+# SonarQube
+sonar-project.properties
+.scannerwork/
