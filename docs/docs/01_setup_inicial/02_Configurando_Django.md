@@ -60,12 +60,16 @@ class CoreConfig(AppConfig):
 E agora no `./myapi/settings.py`, vamos incluir o seguinte:
 
 - Tirar a SECRET_KEY do `settings.py` e importar o `.env` através da lib `decouple`
+- Tornar o `DEBUG` configurável via `.env` (nunca deixar `True` fixo no código)
 - Adicionar ALLOWED_HOSTS já com o domínio que futuramente colocaremos pra nossa Prod
 - Adicionar a nossa app `core` em `INSTALLED_APPS`, junto com a extensão `django_extensions`, que poderemos usar mais pra frente
 - Configurar o Banco de Dados Postgres ao invés do SQLIte
 
 ```python title="./myapi/settings.py" hl_lines="12-13"
 from decouple import Csv, config
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 

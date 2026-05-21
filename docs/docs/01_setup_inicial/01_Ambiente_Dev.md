@@ -86,6 +86,7 @@ FRONTEND_FQDN=react.brunononogaki.com
 NEXT_PUBLIC_API_URL=myapi.brunononogaki.com
 
 # BACKEND CONFIG
+DEBUG=True
 SECRET_KEY='mysecretkey-dev'
 ALLOWED_HOSTS=localhost,127.0.0.1,.brunononogaki.com
 
@@ -94,6 +95,10 @@ DJANGO_ADMIN_USER = 'admin'
 DJANGO_ADMIN_EMAIL = 'admin@admin.com'
 DJANGO_ADMIN_PASSWORD = 'devpassword'
 ```
+
+!!! warning
+
+    `DEBUG=True` nunca deve ir para produção. Em modo debug, qualquer erro 500 expõe stack traces completos, variáveis locais e detalhes do banco de dados. No `.env.production`, sempre use `DEBUG=False`.
 
 ## Instalando ferramentas de Dev
 
