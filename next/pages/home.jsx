@@ -3,32 +3,7 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import { isAuthenticated, logoutUser } from "utils/auth";
 import { getCurrentUser, updateUser, changeUserPassword } from "utils/users";
-
-const darkStyles = `
-  .dark-input {
-    width: 100%;
-    padding: 10px 16px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 10px;
-    color: #fff;
-    font-size: 14px;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  .dark-input::placeholder { color: rgba(255,255,255,0.2); }
-  .dark-input:focus { border-color: rgba(99,102,241,0.6); }
-  .dark-input:disabled { opacity: 0.4; cursor: not-allowed; }
-  .dark-label {
-    display: block;
-    font-size: 12px;
-    color: rgba(255,255,255,0.4);
-    margin-bottom: 6px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-`;
+import { darkStyles } from "styles/darkTheme";
 
 function ChangePasswordModal({ isOpen, userId, onClose }) {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
