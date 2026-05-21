@@ -188,6 +188,8 @@ Para isso, vamos adicionar um script no `./myapi/core/apps.py`:
 from decouple import config
 from django.apps import AppConfig
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models.signals import post_migrate
 from loguru import logger
 
@@ -226,6 +228,10 @@ class CoreConfig(AppConfig):
                     existing.email = email
                     changed = True
                 if password:
+                    try:
+                        validate_password(password, user=existing)
+                    except DjangoValidationError as e:
+                        logger.warning(f'⚠️ Superuser password does not meet validators: {e.messages}')
                     existing.set_password(password)
                     changed = True
                 if changed:

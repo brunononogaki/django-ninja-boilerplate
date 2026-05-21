@@ -1,6 +1,8 @@
 import uuid
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from loguru import logger
 from ninja import Router
 from ninja.pagination import paginate
@@ -201,7 +203,11 @@ def patch_user_password(request, id: uuid.UUID, payload: UserPatchPasswordSchema
         logger.warning(f'Failed password change attempt for user {user.username} - wrong current password')
         raise ValidationError('Current password is incorrect.')
 
-    # Set new password (this hashes it properly)
+    try:
+        validate_password(payload.new_password, user=user)
+    except DjangoValidationError as e:
+        raise ValidationError(', '.join(e.messages))
+
     user.set_password(payload.new_password)
 
     try:
@@ -307,6 +313,11 @@ def confirm_password_reset(request, token_id: uuid.UUID, payload: PasswordResetC
     if user is None:
         logger.warning(f'Attempt to change password with invalid token: token_id={token_id}')
         raise ValidationError('Invalid password reset token.')
+
+    try:
+        validate_password(payload.new_password, user=user)
+    except DjangoValidationError as e:
+        raise ValidationError(', '.join(e.messages))
 
     user.set_password(payload.new_password)
     try:
