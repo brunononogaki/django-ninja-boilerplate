@@ -180,3 +180,11 @@ pyrightconfig.json
 .vscode
 .DS_Store
 node_modules
+
+# Claude Code
+.claude/
+.agent/
+
+# SonarQube
+sonar-project.properties
+.scannerwork/
