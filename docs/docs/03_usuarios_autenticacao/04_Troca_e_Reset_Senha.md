@@ -72,7 +72,12 @@ def patch_user_password(request, id: uuid.UUID, payload: UserPatchPasswordSchema
         logger.warning(f'Failed password change attempt for user {user.username} - wrong current password')
         raise ValidationError('Current password is incorrect.')
 
-    # Set new password (this hashes it properly)
+    # Validate new password against Django's AUTH_PASSWORD_VALIDATORS
+    try:
+        validate_password(payload.new_password, user=user)
+    except DjangoValidationError as e:
+        raise ValidationError(', '.join(e.messages))
+
     user.set_password(payload.new_password)
 
     try:
@@ -83,6 +88,24 @@ def patch_user_password(request, id: uuid.UUID, payload: UserPatchPasswordSchema
         logger.error(f'Failed to update password for user {user.username}: {e}')
         raise ServiceError('Failed to change password. Please try again later.')
 ```
+
+!!! tip "Por que `validate_password` antes de `set_password`?"
+
+    O `set_password()` do Django apenas faz o **hash** da senha — ele não verifica se a senha atende às regras configuradas em `AUTH_PASSWORD_VALIDATORS` (comprimento mínimo, senhas comuns, etc.). Sem a chamada explícita a `validate_password()`, qualquer senha seria aceita, incluindo `"123"`.
+
+    O `validate_password()` lança `DjangoValidationError` se a senha não for válida. Por isso capturamos a exceção e lançamos nossa `ValidationError` customizada, que retorna um `400` com a mensagem de erro para o front-end.
+
+    ```python
+    from django.contrib.auth.password_validation import validate_password
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    try:
+        validate_password(payload.new_password, user=user)
+    except DjangoValidationError as e:
+        raise ValidationError(', '.join(e.messages))
+
+    user.set_password(payload.new_password)
+    ```
 
 E agora vamos cobrir isso com testes:
 
@@ -428,6 +451,12 @@ def confirm_password_reset(request, token_id: uuid.UUID, payload: PasswordResetC
     if user is None:
         logger.warning(f'Attempt to change password with invalid token: token_id={token_id}')
         raise ValidationError('Invalid password reset token.')
+
+    # Validate new password against Django's AUTH_PASSWORD_VALIDATORS
+    try:
+        validate_password(payload.new_password, user=user)
+    except DjangoValidationError as e:
+        raise ValidationError(', '.join(e.messages))
 
     user.set_password(payload.new_password)
     try:
