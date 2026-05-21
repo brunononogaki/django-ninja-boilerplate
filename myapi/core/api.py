@@ -9,6 +9,7 @@ from ninja import Router
 
 from .auth import clear_auth_cookies, create_token, set_auth_cookies, verify_refresh_token
 from .exceptions import ServiceError, UnauthorizedError
+from .ratelimit import check_rate_limit
 from .schemas import LoginRequest, MessageSchema, StatusSchema
 
 router = Router(tags=['Admin'])
@@ -51,6 +52,7 @@ def status(request):
 ##############
 @router.post('login', tags=['Auth'], response={200: MessageSchema})
 def login(request, response: HttpResponse, credentials: LoginRequest):
+    check_rate_limit(request, group='login')
     user = authenticate(username=credentials.username, password=credentials.password)
     if not user:
         logger.warning(f'Failed login attempt for username: {credentials.username}')
