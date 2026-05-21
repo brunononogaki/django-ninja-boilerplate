@@ -136,6 +136,11 @@ services:
     depends_on:
       - database
     restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
     volumes:
       - ../:/app
     environment:

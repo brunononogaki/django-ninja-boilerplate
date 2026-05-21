@@ -7,6 +7,12 @@ services:
     env_file:
       - ../.env.production
     restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+      - /run/postgresql
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -36,6 +42,11 @@ services:
     depends_on:
       - database
     restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
     volumes:
       - ../:/app
     environment:

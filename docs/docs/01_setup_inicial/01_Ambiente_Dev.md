@@ -192,6 +192,8 @@ services:
     ports:
       - "5432:5432"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     logging:
       driver: "json-file"
       options:
