@@ -7,6 +7,8 @@ services:
     env_file:
       - ../.env.production
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -36,6 +38,8 @@ services:
     depends_on:
       - database
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - ../:/app
     environment:

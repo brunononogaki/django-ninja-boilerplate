@@ -136,6 +136,8 @@ services:
     depends_on:
       - database
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - ../:/app
     environment:
