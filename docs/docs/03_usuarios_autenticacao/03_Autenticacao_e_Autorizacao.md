@@ -496,12 +496,8 @@ class OwnerOrAdminAuth(JWTAuth):
         if not user:
             return None
 
-        target_identifier = None
-        try:
-            # Pega o ID ou username do último segmento do path
-            target_identifier = str(request.path).split('/')[-1]
-        except Exception:
-            target_identifier = None
+        # resolver_match.kwargs contém os parâmetros nomeados da URL já resolvidos pelo Django
+        target_identifier = str(request.resolver_match.kwargs.get('id', ''))
 
         # Se não há target_identifier, só admins tem acesso
         if not target_identifier:
@@ -511,8 +507,8 @@ class OwnerOrAdminAuth(JWTAuth):
         if getattr(user, 'is_staff', False):
             return user
 
-        # Para não-admins, verifica se é o próprio usuário (por ID ou username)
-        if str(user.id) == str(target_identifier) or user.username == target_identifier:
+        # Para não-admins, verifica se é o próprio usuário
+        if str(user.id) == target_identifier:
             return user
 
         return None
