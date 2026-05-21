@@ -186,6 +186,12 @@ CORS_ALLOWED_ORIGINS = config(
 # Permitir credenciais (cookies) em requisições CORS
 CORS_ALLOW_CREDENTIALS = True
 
+# Cookie settings
+# Em produção: COOKIE_SECURE=True (só envia cookies via HTTPS)
+# Em produção: COOKIE_DOMAIN=.seudominio.com (ponto inicial para cobrir subdomínios)
+COOKIE_SECURE = config('COOKIE_SECURE', default=False, cast=bool)
+COOKIE_DOMAIN = config('COOKIE_DOMAIN', default=None)
+
 # Email Configuration - Gmail via Django
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
@@ -228,6 +234,11 @@ ACCOUNT_LOGOUT_REDIRECT_URL = f'{FRONTEND_PROTOCOL}://{FRONTEND_FQDN}/'
 # Configurações dos providers sociais
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
+        'APP': {
+            'client_id': config('GOOGLE_CLIENT_ID', default=''),
+            'secret': config('GOOGLE_CLIENT_SECRET', default=''),
+            'key': '',
+        },
         'SCOPE': [
             'profile',
             'email',
