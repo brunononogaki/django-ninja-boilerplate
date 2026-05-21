@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import jwt
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from ninja.security import HttpBearer
+from ninja.security import APIKeyCookie
 
 User = get_user_model()
 ALGO = 'HS256'
@@ -28,7 +28,6 @@ def create_token(user):
 
 
 def verify_refresh_token(token):
-    """Verify refresh token and return the user"""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGO])
         if payload.get('type') != 'refresh':
@@ -41,11 +40,53 @@ def verify_refresh_token(token):
         return None
 
 
-class JWTAuth(HttpBearer):
-    @staticmethod
-    def authenticate(request, token):
+def set_auth_cookies(response, tokens):
+    """Seta os cookies httpOnly de autenticação na resposta."""
+    secure = getattr(settings, 'COOKIE_SECURE', False)
+    domain = getattr(settings, 'COOKIE_DOMAIN', None)
+    response.set_cookie(
+        'access_token',
+        tokens['access_token'],
+        max_age=int(ACCESS_LIFETIME.total_seconds()),
+        httponly=True,
+        secure=secure,
+        samesite='Lax',
+        domain=domain,
+    )
+    response.set_cookie(
+        'refresh_token',
+        tokens['refresh_token'],
+        max_age=int(REFRESH_LIFETIME.total_seconds()),
+        httponly=True,
+        secure=secure,
+        samesite='Lax',
+        domain=domain,
+    )
+    response.set_cookie(
+        'is_logged_in',
+        'true',
+        max_age=int(REFRESH_LIFETIME.total_seconds()),
+        httponly=False,
+        secure=secure,
+        samesite='Lax',
+        domain=domain,
+    )
+
+
+def clear_auth_cookies(response):
+    """Remove todos os cookies de autenticação da resposta."""
+    domain = getattr(settings, 'COOKIE_DOMAIN', None)
+    response.delete_cookie('access_token', domain=domain, samesite='Lax')
+    response.delete_cookie('refresh_token', domain=domain, samesite='Lax')
+    response.delete_cookie('is_logged_in', domain=domain, samesite='Lax')
+
+
+class JWTAuth(APIKeyCookie):
+    param_name = 'access_token'
+
+    def authenticate(self, request, key):
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGO])
+            payload = jwt.decode(key, settings.SECRET_KEY, algorithms=[ALGO])
             if payload.get('type') != 'access':
                 return None
             user_id = payload.get('user_id')
@@ -57,8 +98,8 @@ class JWTAuth(HttpBearer):
 
 
 class AdminAuth(JWTAuth):
-    def authenticate(self, request, token):
-        user = super().authenticate(request, token)
+    def authenticate(self, request, key):
+        user = super().authenticate(request, key)
         if not user:
             return None
         if not getattr(user, 'is_staff', False):
@@ -67,14 +108,13 @@ class AdminAuth(JWTAuth):
 
 
 class OwnerOrAdminAuth(JWTAuth):
-    def authenticate(self, request, token):
-        user = super().authenticate(request, token)
+    def authenticate(self, request, key):
+        user = super().authenticate(request, key)
         if not user:
             return None
 
         target_identifier = None
         try:
-            # Pega o ID ou username que vem após /users/
             path_parts = str(request.path).split('/')
             if 'users' in path_parts:
                 users_index = path_parts.index('users')
@@ -83,15 +123,12 @@ class OwnerOrAdminAuth(JWTAuth):
         except Exception:
             target_identifier = None
 
-        # Se não há target_identifier, só admins tem acesso
         if not target_identifier:
             return user if getattr(user, 'is_staff', False) else None
 
-        # Verifica se é admin
         if getattr(user, 'is_staff', False):
             return user
 
-        # Para não-admins, verifica se é o próprio usuário (por ID ou username)
         if str(user.id) == str(target_identifier) or user.username == target_identifier:
             return user
 

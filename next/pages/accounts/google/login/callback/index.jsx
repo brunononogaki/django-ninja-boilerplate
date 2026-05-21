@@ -29,19 +29,11 @@ export default function GoogleCallback() {
         setIsLoading(true);
 
         // Chamar endpoint pra gerar JWT usando a sessão Django
-        const response = await getSocialToken();
+        // O backend seta os cookies httpOnly automaticamente na resposta
+        await getSocialToken();
 
-        if (response.access_token) {
-          // JWT foi gerado com sucesso
-          console.log("✅ JWT gerado com sucesso");
-
-          // Pequeno delay pra garantir que o localStorage foi salvo
-          setTimeout(() => {
-            router.push("/home");
-          }, 500);
-        } else {
-          throw new Error("Nenhum token de acesso recebido");
-        }
+        console.log("✅ Autenticação realizada com sucesso");
+        router.push("/home");
       } catch (err) {
         console.error("❌ Erro ao gerar JWT:", err);
 
