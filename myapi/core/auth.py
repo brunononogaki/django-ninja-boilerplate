@@ -1,10 +1,13 @@
 # myapi/core/auth.py
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 import jwt
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from ninja.security import APIKeyCookie
+
+from .models import RefreshTokenDenylist
 
 User = get_user_model()
 ALGO = 'HS256'
@@ -20,7 +23,7 @@ def create_token(user):
         algorithm=ALGO,
     )
     refresh_token = jwt.encode(
-        {'user_id': str(user.id), 'exp': now + REFRESH_LIFETIME, 'type': 'refresh'},
+        {'user_id': str(user.id), 'exp': now + REFRESH_LIFETIME, 'type': 'refresh', 'jti': str(uuid4())},
         settings.SECRET_KEY,
         algorithm=ALGO,
     )
@@ -32,6 +35,20 @@ def verify_refresh_token(token):
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGO])
         if payload.get('type') != 'refresh':
             return None
+
+        jti = payload.get('jti')
+        exp = payload.get('exp')
+
+        RefreshTokenDenylist.cleanup_expired()
+
+        if RefreshTokenDenylist.objects.filter(jti=jti).exists():
+            return None
+
+        RefreshTokenDenylist.objects.create(
+            jti=jti,
+            expires_at=datetime.fromtimestamp(exp, tz=timezone.utc),
+        )
+
         user_id = payload.get('user_id')
         return User.objects.get(id=user_id)
     except jwt.ExpiredSignatureError:
