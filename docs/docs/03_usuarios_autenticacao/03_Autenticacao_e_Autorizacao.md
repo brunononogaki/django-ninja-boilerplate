@@ -6,6 +6,43 @@ Então até agora temos os nossos CRUDs de usuários criados, assim como a rota 
 
 Vamos implantar a autenticação da API por meio de tokens JWT. Para isso, vamos instalar o `PyJWT`
 
+### JWT_SECRET_KEY separado do SECRET_KEY
+
+O Django usa o `SECRET_KEY` para assinar sessões, tokens CSRF, links de reset de senha e outros mecanismos internos. Se usarmos a mesma chave para assinar os JWTs, qualquer rotação do `SECRET_KEY` invalida todos esses mecanismos ao mesmo tempo — e vice-versa.
+
+Por isso, definimos uma chave dedicada para JWT no `settings.py`:
+
+```python title="./myapi/settings.py"
+SECRET_KEY = config('SECRET_KEY')
+JWT_SECRET_KEY = config('JWT_SECRET_KEY', default=SECRET_KEY)
+```
+
+O `default=SECRET_KEY` garante retrocompatibilidade: se `JWT_SECRET_KEY` não estiver no `.env`, o comportamento é idêntico ao anterior. Em produção, configure sempre uma chave distinta.
+
+Adicione nos arquivos `.env`:
+
+```bash title="./.env.development"
+JWT_SECRET_KEY='myjwtsecretkey-dev'
+```
+
+```bash title="./.env.production"
+JWT_SECRET_KEY='your-strong-random-jwt-secret-key'
+```
+
+No `auth.py`, todos os `jwt.encode` e `jwt.decode` passam a usar `settings.JWT_SECRET_KEY`:
+
+```python title="./myapi/core/auth.py" hl_lines="3"
+access_token = jwt.encode(
+    {'user_id': str(user.id), 'exp': now + ACCESS_LIFETIME, 'type': 'access'},
+    settings.JWT_SECRET_KEY,
+    algorithm=ALGO,
+)
+```
+
+!!! tip
+
+    Para gerar uma chave forte, use: `python -c "import secrets; print(secrets.token_hex(32))"`
+
 ```bash
 poetry add PyJWT
 ```

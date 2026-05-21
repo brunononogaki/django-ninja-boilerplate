@@ -19,12 +19,12 @@ def create_token(user):
     now = datetime.utcnow()
     access_token = jwt.encode(
         {'user_id': str(user.id), 'exp': now + ACCESS_LIFETIME, 'type': 'access'},
-        settings.SECRET_KEY,
+        settings.JWT_SECRET_KEY,
         algorithm=ALGO,
     )
     refresh_token = jwt.encode(
         {'user_id': str(user.id), 'exp': now + REFRESH_LIFETIME, 'type': 'refresh', 'jti': str(uuid4())},
-        settings.SECRET_KEY,
+        settings.JWT_SECRET_KEY,
         algorithm=ALGO,
     )
     return {'access_token': access_token, 'refresh_token': refresh_token}
@@ -32,7 +32,7 @@ def create_token(user):
 
 def verify_refresh_token(token):
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGO])
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[ALGO])
         if payload.get('type') != 'refresh':
             return None
 
@@ -103,7 +103,7 @@ class JWTAuth(APIKeyCookie):
 
     def authenticate(self, request, key):  # noqa: PLR6301
         try:
-            payload = jwt.decode(key, settings.SECRET_KEY, algorithms=[ALGO])
+            payload = jwt.decode(key, settings.JWT_SECRET_KEY, algorithms=[ALGO])
             if payload.get('type') != 'access':
                 return None
             user_id = payload.get('user_id')
