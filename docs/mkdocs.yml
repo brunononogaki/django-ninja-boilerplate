@@ -26,8 +26,8 @@ nav:
       - 04. Criando a tela de ativação: 04_frontend_login/04_Tela_ativacao.md
       - 05. Criando a tela de edição de dados do usuário: 04_frontend_login/05_Tela_edicao_dados.md
       - 06. Criando a tela de reset de senha: 04_frontend_login/06_Tela_reset_senha.md
-  - Social Login com Google:
-      - 01. Configurando o Login do Google com django-allauth: 05_login_social/01_Configurando_Login_Google.md
+      - 07. Mudando a autenticação para evitar ataques de XSS: 04_frontend_login/07_Problema_de_XSS.md
+      - 08. Configurando o Login do Google com django-allauth: 04_frontend_login/08_Configurando_Login_Google.md     
   - Apêndice:
       - 01. Configurando o Traefik: Appendix/01_Configurando_o_Traefik.md
 theme:
