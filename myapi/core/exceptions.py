@@ -1,4 +1,3 @@
-from ninja.responses import Response
 
 
 class APIException(Exception):

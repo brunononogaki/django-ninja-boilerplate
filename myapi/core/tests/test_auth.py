@@ -178,7 +178,7 @@ def test_protected_endpoint_without_cookie(client):
 
 @pytest.mark.django_db
 def test_social_token_success(client):
-    user = User.objects.create_user(username='google_user', email='google@example.com', password='testpass123')
+    User.objects.create_user(username='google_user', email='google@example.com', password='testpass123')
     client.login(username='google_user', password='testpass123')
 
     response = client.post('/api/v1/social-token')

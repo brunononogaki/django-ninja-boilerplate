@@ -27,7 +27,7 @@ export default function Activate() {
           setStatus("success");
           setMessage("Conta ativada com sucesso!");
           setTimeout(() => {
-            router.push("/");
+            router.push("/login");
           }, 2000);
         } else {
           const data = await response.json();
@@ -110,7 +110,7 @@ export default function Activate() {
             </h1>
             <p className="text-red-600 mb-4">{message}</p>
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/login")}
               className="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
             >
               Voltar para o Login

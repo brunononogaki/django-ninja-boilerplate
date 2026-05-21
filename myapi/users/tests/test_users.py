@@ -11,8 +11,7 @@ from django.core import mail
 from django.utils import timezone
 from freezegun import freeze_time
 
-from myapi.users.models import ActivationToken
-from myapi.users.models import PasswordResetToken
+from myapi.users.models import ActivationToken, PasswordResetToken
 
 
 @pytest.fixture
@@ -30,7 +29,7 @@ def admin_client(client):
 def non_admin_client():
     """Cliente autenticado como usuário não-admin. Usa instância própria de Client
     para não conflitar com o admin_client quando ambos são usados no mesmo teste."""
-    from django.test import Client
+    from django.test import Client  # noqa: PLC0415
     c = Client()
 
     user_payload = {
@@ -162,7 +161,7 @@ def test_create_users_success(client):
 
     assert response.status_code == HTTPStatus.CREATED
     assert response_json['username'] == user_payload['username']
-    assert response_json['is_active'] == False
+    assert not response_json['is_active']
 
     assert len(mail.outbox) == 1
     email = mail.outbox[0]
