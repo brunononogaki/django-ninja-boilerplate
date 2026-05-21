@@ -42,7 +42,7 @@ export async function apiCall(endpoint, options = {}) {
       credentials: "include",
     });
   } catch (err) {
-    console.error(`Erro de conexão ao fazer requisição para ${url}:`, err);
+    console.error("Erro de conexão ao fazer requisição para", url, err);
     throw new Error(`Erro de conexão: ${err.message}`);
   }
 
@@ -56,14 +56,14 @@ export async function apiCall(endpoint, options = {}) {
   try {
     data = await response.json();
   } catch (err) {
-    console.error(`Erro ao fazer parse de JSON da resposta de ${url}:`, err);
+    console.error("Erro ao fazer parse de JSON da resposta de", url, err);
     throw new Error(`Erro ao processar resposta: ${response.statusText}`);
   }
 
   // Se não foi sucesso (2xx), lançar erro com detalhes
   if (!response.ok) {
     const errorMessage = data?.message || response.statusText;
-    console.error(`Erro ${response.status} em ${url}:`, data);
+    console.error("Erro", response.status, "em", url, data);
     throw new Error(`Erro ${response.status}: ${errorMessage}`);
   }
 
