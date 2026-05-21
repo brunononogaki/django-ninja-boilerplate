@@ -716,3 +716,87 @@ def test_social_token_success(client):
     assert 'access_token' in response.cookies
     assert 'refresh_token' in response.cookies
 ```
+
+---
+
+### 11. `users/tests/test_users.py`
+
+Os testes de usuários usavam duas fixtures que também precisam mudar:
+
+**Antes**, as fixtures faziam login e extraíam o token do body JSON, depois cada teste passava o token via `HTTP_AUTHORIZATION`:
+
+```python
+# ANTES — fixtures antigas
+@pytest.fixture
+def create_admin_access_token(client):
+    response = client.post('/api/v1/login', ...)
+    return response.json()['access_token']  # KeyError: 'access_token' agora!
+
+@pytest.fixture
+def create_non_admin_access_token(client):
+    # ... cria usuário ...
+    response = client.post('/api/v1/login', ...)
+    return response.json()['access_token']  # KeyError: 'access_token' agora!
+
+# ANTES — uso nos testes
+def test_list_users(client, create_admin_access_token):
+    response = client.get('/api/v1/users', HTTP_AUTHORIZATION=f'Bearer {create_admin_access_token}')
+```
+
+**Depois**, as fixtures fazem login e retornam o próprio cliente já autenticado (com o cookie setado). Os testes usam esse cliente diretamente, sem precisar passar nenhum header:
+
+```python title="myapi/users/tests/test_users.py"
+@pytest.fixture
+def admin_client(client):
+    """Cliente autenticado como admin. O cookie é setado automaticamente pelo login."""
+    client.post(
+        '/api/v1/login',
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
+    )
+    return client
+
+
+@pytest.fixture
+def non_admin_client():
+    """Cliente autenticado como usuário não-admin. Usa instância própria de Client
+    para não conflitar com o admin_client quando ambos são usados no mesmo teste."""
+    from django.test import Client
+    c = Client()
+
+    user_payload = {
+        'username': 'new_user_non_admin',
+        'first_name': 'New',
+        'last_name': 'User',
+        'email': 'user_new@admin.com',
+        'password': 'myuserpassword',
+    }
+    c.post('/api/v1/users', data=json.dumps(user_payload), content_type='application/json')
+
+    User = get_user_model()
+    user = User.objects.get(username='new_user_non_admin')
+    user.is_active = True
+    user.save()
+
+    c.post(
+        '/api/v1/login',
+        data=json.dumps({'username': 'new_user_non_admin', 'password': 'myuserpassword'}),
+        content_type='application/json',
+    )
+    return c
+
+
+# DEPOIS — uso nos testes (sem HTTP_AUTHORIZATION, sem client separado)
+@pytest.mark.django_db
+def test_list_users(admin_client):
+    response = admin_client.get('/api/v1/users')
+    ...
+
+@pytest.mark.django_db
+def test_get_user_detail_admin_to_other_user(admin_client, non_admin_client):
+    user = User.objects.get(username='new_user_non_admin')
+    response = admin_client.get(f'/api/v1/users/{user.id}')
+    ...
+```
+
+> **Por que o `non_admin_client` usa `Client()` separado?** Em pytest, quando dois fixtures recebem o mesmo parâmetro `client`, eles compartilham a mesma instância dentro do teste. Se ambas as fixtures fizessem login no mesmo `client`, o segundo login sobrescreveria o cookie do primeiro. Com instâncias separadas, o `admin_client` e o `non_admin_client` mantêm sessões independentes no mesmo teste.
