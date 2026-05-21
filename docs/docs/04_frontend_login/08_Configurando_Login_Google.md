@@ -169,11 +169,6 @@ ACCOUNT_LOGOUT_REDIRECT_URL = f'{FRONTEND_PROTOCOL}://{FRONTEND_FQDN}/'
 # Configurações dos providers sociais
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
-        'APP': {
-            'client_id': config('GOOGLE_CLIENT_ID', default=''),
-            'secret': config('GOOGLE_CLIENT_SECRET', default=''),
-            'key': '',
-        },
         'SCOPE': [
             'profile',
             'email',
@@ -240,15 +235,9 @@ Ao final do wizard, clique em `Criar um cliente OAuth`
   * `http://localhost:8000/accounts/google/login/callback/`
   * `https://myapi.brunononogaki.com/accounts/google/login/callback/`
 
-1. Salve os dados do Client ID e Secret Key no .env, nas variáveis `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`
+1. Anote o Client ID e a Secret Key — você vai precisar deles no passo seguinte.
 
 ![alt text](static/gcp-oauth-keys.png)
-
-```bash title="./env-production"
-# GOOGLE OAUTH
-GOOGLE_CLIENT_ID=XXXXXX
-GOOGLE_CLIENT_SECRET=XXXXXX
-```
 
 ## Configurando no Django Admin
 

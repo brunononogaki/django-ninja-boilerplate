@@ -234,11 +234,6 @@ ACCOUNT_LOGOUT_REDIRECT_URL = f'{FRONTEND_PROTOCOL}://{FRONTEND_FQDN}/'
 # Configurações dos providers sociais
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
-        'APP': {
-            'client_id': config('GOOGLE_CLIENT_ID', default=''),
-            'secret': config('GOOGLE_CLIENT_SECRET', default=''),
-            'key': '',
-        },
         'SCOPE': [
             'profile',
             'email',
