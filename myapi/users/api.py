@@ -10,21 +10,20 @@ from ninja.responses import Response
 
 from ..core.auth import AdminAuth, JWTAuth, OwnerOrAdminAuth
 from ..core.exceptions import ConflictError, NotFoundError, ServiceError, ValidationError
-from .models import ActivationToken, PasswordResetToken
 from .schemas import (
-    UserCreateSchema,
-    UserPatchSchema,
-    UserPatchPasswordSchema,
-    PasswordResetRequestSchema,
     PasswordResetConfirmSchema,
+    PasswordResetRequestSchema,
+    UserCreateSchema,
+    UserPatchPasswordSchema,
+    UserPatchSchema,
     UserWithGroupsSchema,
 )
 from .services import (
-    send_activation_email,
-    verify_activation_token,
-    send_password_reset_email,
     confirm_password_reset_token,
+    send_activation_email,
+    send_password_reset_email,
     validate_password_reset_token,
+    verify_activation_token,
 )
 
 router = Router(tags=['Users'])

@@ -1,50 +1,20 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
+import Head from "next/head";
 import { getSocialToken } from "utils/auth";
 
-/**
- * Página de Callback do Google OAuth
- *
- * Fluxo:
- * 1. User clica em "Login com Google"
- * 2. Redireciona pra /accounts/google/login/
- * 3. User autentica no Google
- * 4. Google redireciona de volta pro /accounts/google/login/callback/ (Django)
- * 5. Django cria user + sessão
- * 6. Django redireciona pra LOGIN_REDIRECT_URL
- * 7. User chega nessa página com sessão Django ativa
- * 8. Essa página chama getSocialToken() pra gerar JWT
- * 9. Armazena tokens no localStorage
- * 10. Redireciona pra /home
- */
 export default function GoogleCallback() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        setError("");
-        setIsLoading(true);
-
-        // Chamar endpoint pra gerar JWT usando a sessão Django
-        // O backend seta os cookies httpOnly automaticamente na resposta
         await getSocialToken();
-
-        console.log("✅ Autenticação realizada com sucesso");
         router.push("/home");
       } catch (err) {
-        console.error("❌ Erro ao gerar JWT:", err);
-
-        // Mensagem de erro mais clara
-        let errorMessage = "Erro ao processar autenticação. Tente novamente.";
-        if (err.message) {
-          errorMessage = err.message;
-        }
-
-        setError(errorMessage);
-        setIsLoading(false);
+        console.error("Erro ao gerar JWT:", err);
+        setError(err.message || "Erro ao processar autenticação. Tente novamente.");
       }
     };
 
@@ -52,68 +22,52 @@ export default function GoogleCallback() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full text-center">
-        {isLoading && !error && (
-          <>
-            <div className="flex justify-center mb-4">
-              <div className="animate-spin">
-                <svg
-                  className="w-12 h-12 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-              </div>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Processando Login
-            </h1>
-            <p className="text-gray-600 text-sm">
-              Estamos gerando seus tokens de acesso...
-            </p>
-          </>
-        )}
+    <>
+      <Head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+      </Head>
 
-        {error && (
-          <>
-            <div className="flex justify-center mb-4">
-              <svg
-                className="w-12 h-12 text-red-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Erro na Autenticação
-            </h1>
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
-              {error}
-            </div>
-            <button
-              onClick={() => (window.location.href = "/")}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
-            >
-              Voltar para Login
-            </button>
-          </>
-        )}
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#07070f", fontFamily: "'DM Sans', sans-serif" }}>
+        {/* Dot grid */}
+        <div className="absolute inset-0" style={{
+          backgroundImage: "radial-gradient(circle, rgba(99,102,241,0.15) 1px, transparent 1px)",
+          backgroundSize: "44px 44px",
+          maskImage: "radial-gradient(ellipse 60% 60% at 50% 50%, black 30%, transparent 100%)",
+        }} />
+
+        <div className="relative z-10 text-center px-6">
+          {!error ? (
+            <>
+              {/* Spinner */}
+              <div className="flex justify-center mb-8">
+                <div className="relative w-14 h-14">
+                  <div className="absolute inset-0 rounded-full" style={{ border: "2px solid rgba(99,102,241,0.15)" }} />
+                  <div className="absolute inset-0 rounded-full animate-spin" style={{ border: "2px solid transparent", borderTopColor: "#818cf8" }} />
+                </div>
+              </div>
+              <p className="text-white font-medium mb-1">Autenticando...</p>
+              <p className="text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>Aguarde um momento</p>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-center mb-6">
+                <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "#f87171" }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-white font-medium mb-2">Erro na autenticação</p>
+              <p className="text-sm mb-8 max-w-xs mx-auto" style={{ color: "rgba(255,255,255,0.35)" }}>{error}</p>
+              <button onClick={() => router.push("/")} className="px-6 py-2.5 rounded-xl text-sm font-medium text-white transition-all duration-200" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+                Voltar ao início
+              </button>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

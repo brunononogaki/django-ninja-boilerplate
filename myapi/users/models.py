@@ -7,6 +7,7 @@ from django.utils import timezone
 
 class UUIDUser(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    avatar_url = models.URLField(null=True, blank=True)
 
     def __str__(self):
         return self.username

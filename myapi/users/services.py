@@ -7,7 +7,7 @@ from loguru import logger
 
 from infra.mailer import send_message
 
-from ..core.exceptions import ValidationError, ServiceError
+from ..core.exceptions import ServiceError, ValidationError
 from .models import ActivationToken, PasswordResetToken
 
 User = get_user_model()

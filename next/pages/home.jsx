@@ -1,7 +1,116 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
+import Head from "next/head";
 import { isAuthenticated, logoutUser } from "utils/auth";
 import { getCurrentUser, updateUser, changeUserPassword } from "utils/users";
+
+const darkStyles = `
+  .dark-input {
+    width: 100%;
+    padding: 10px 16px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .dark-input::placeholder { color: rgba(255,255,255,0.2); }
+  .dark-input:focus { border-color: rgba(99,102,241,0.6); }
+  .dark-input:disabled { opacity: 0.4; cursor: not-allowed; }
+  .dark-label {
+    display: block;
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 6px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+`;
+
+function ChangePasswordModal({ isOpen, userId, onClose }) {
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [msg, setMsg] = useState({ type: "", text: "" });
+  const [form, setForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+
+  const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+
+  const validate = () => {
+    if (!form.currentPassword) { setMsg({ type: "error", text: "Informe sua senha atual" }); return false; }
+    if (!form.newPassword) { setMsg({ type: "error", text: "Informe a nova senha" }); return false; }
+    if (form.newPassword.length < 8) { setMsg({ type: "error", text: "A nova senha deve ter pelo menos 8 caracteres" }); return false; }
+    if (form.newPassword !== form.confirmPassword) { setMsg({ type: "error", text: "As senhas não correspondem" }); return false; }
+    if (form.currentPassword === form.newPassword) { setMsg({ type: "error", text: "A nova senha deve ser diferente da atual" }); return false; }
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMsg({ type: "", text: "" });
+    if (!validate()) return;
+    setIsChangingPassword(true);
+    try {
+      await changeUserPassword(userId, form.currentPassword, form.newPassword);
+      setMsg({ type: "success", text: "Senha alterada com sucesso!" });
+      setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setTimeout(() => { onClose(); setMsg({ type: "", text: "" }); }, 2000);
+    } catch (error) {
+      setMsg({ type: "error", text: error.message || "Erro ao alterar senha" });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleClose = () => {
+    setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    setMsg({ type: "", text: "" });
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
+      <div className="w-full max-w-md rounded-2xl p-8" style={{ background: "#0f0f1a", border: "1px solid rgba(255,255,255,0.1)" }}>
+        <h2 className="text-lg font-bold text-white mb-1" style={{ fontFamily: "'Syne', sans-serif" }}>Alterar Senha</h2>
+        <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.35)" }}>Escolha uma senha segura</p>
+
+        {msg.text && (
+          <div className="mb-5 px-4 py-3 rounded-xl text-sm" style={msg.type === "success"
+            ? { background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", color: "#86efac" }
+            : { background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#fca5a5" }}>
+            {msg.text}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="dark-label">Senha Atual</label>
+            <input type="password" name="currentPassword" value={form.currentPassword} onChange={handleChange} placeholder="••••••••" disabled={isChangingPassword} className="dark-input" />
+          </div>
+          <div>
+            <label className="dark-label">Nova Senha</label>
+            <input type="password" name="newPassword" value={form.newPassword} onChange={handleChange} placeholder="Mín. 8 caracteres" disabled={isChangingPassword} className="dark-input" />
+          </div>
+          <div>
+            <label className="dark-label">Confirmar Nova Senha</label>
+            <input type="password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange} placeholder="••••••••" disabled={isChangingPassword} className="dark-input" />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="submit" disabled={isChangingPassword} className="flex-1 py-2.5 rounded-xl font-medium text-sm text-white transition-all duration-200" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+              {isChangingPassword ? "Alterando..." : "Alterar"}
+            </button>
+            <button type="button" onClick={handleClose} disabled={isChangingPassword} className="flex-1 py-2.5 rounded-xl font-medium text-sm transition-all duration-200" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.55)", border: "1px solid rgba(255,255,255,0.1)" }}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const router = useRouter();
@@ -10,44 +119,21 @@ export default function Home() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
-  const [formData, setFormData] = useState({
-    username: "",
-    first_name: "",
-    last_name: "",
-    email: "",
-  });
+  const [formData, setFormData] = useState({ username: "", first_name: "", last_name: "", email: "" });
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   useEffect(() => {
-    // Verifica se o usuário está autenticado
-    if (!isAuthenticated()) {
-      router.push("/");
-      return;
-    }
+    if (!isAuthenticated()) { router.push("/"); return; }
 
-    // Busca dados do usuário autenticado
     const fetchUser = async () => {
       try {
         const userData = await getCurrentUser();
-
-        // Verificar se houve erro
-        if (userData.status_code && userData.status_code !== 200) {
-          logoutUser();
-          router.push("/");
-          return;
-        }
-
+        if (userData.status_code && userData.status_code !== 200) { logoutUser(); router.push("/"); return; }
         setUser(userData);
-        setFormData({
-          username: userData.username || "",
-          first_name: userData.first_name || "",
-          last_name: userData.last_name || "",
-          email: userData.email || "",
-        });
+        setFormData({ username: userData.username || "", first_name: userData.first_name || "", last_name: userData.last_name || "", email: userData.email || "" });
       } catch (error) {
         console.error("Erro ao buscar dados do usuário:", error);
-        logoutUser();
-        router.push("/");
+        logoutUser(); router.push("/");
       } finally {
         setIsLoading(false);
       }
@@ -56,531 +142,174 @@ export default function Home() {
     fetchUser();
   }, [router]);
 
-  const handleLogout = async () => {
-    await logoutUser();
-    router.push("/");
-  };
+  const handleLogout = async () => { await logoutUser(); router.push("/"); };
 
   const handleEditToggle = () => {
-    if (isEditing) {
-      // Cancelar edição
-      setFormData({
-        username: user?.username || "",
-        first_name: user?.first_name || "",
-        last_name: user?.last_name || "",
-        email: user?.email || "",
-      });
-    }
+    if (isEditing) setFormData({ username: user?.username || "", first_name: user?.first_name || "", last_name: user?.last_name || "", email: user?.email || "" });
     setIsEditing(!isEditing);
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  const handleInputChange = (e) => setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
 
   const handleSave = async () => {
     setIsSaving(true);
     setMessage({ type: "", text: "" });
-
     try {
       const updatedUser = await updateUser(user.id, formData);
-
       setUser(updatedUser);
       setIsEditing(false);
       setMessage({ type: "success", text: "Dados atualizados com sucesso!" });
       setTimeout(() => setMessage({ type: "", text: "" }), 3000);
     } catch (error) {
-      console.error("Erro ao salvar:", error);
-      const errorMessage = error.message || "Erro ao conectar com o servidor";
-      setMessage({ type: "error", text: errorMessage });
+      setMessage({ type: "error", text: error.message || "Erro ao conectar com o servidor" });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handlePasswordInputChange = (e) => {
-    const { name, value } = e.target;
-    setPasswordFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const validatePasswordForm = () => {
-    // Validar campos vazios
-    if (!passwordFormData.currentPassword) {
-      setPasswordMessage({ type: "error", text: "Informe sua senha atual" });
-      return false;
-    }
-
-    if (!passwordFormData.newPassword) {
-      setPasswordMessage({ type: "error", text: "Informe a nova senha" });
-      return false;
-    }
-
-    if (!passwordFormData.confirmPassword) {
-      setPasswordMessage({ type: "error", text: "Confirme a nova senha" });
-      return false;
-    }
-
-    // Validar comprimento mínimo
-    if (passwordFormData.newPassword.length < 8) {
-      setPasswordMessage({
-        type: "error",
-        text: "A nova senha deve ter pelo menos 8 caracteres",
-      });
-      return false;
-    }
-
-    // Validar se as senhas batem
-    if (passwordFormData.newPassword !== passwordFormData.confirmPassword) {
-      setPasswordMessage({
-        type: "error",
-        text: "As novas senhas não correspondem",
-      });
-      return false;
-    }
-
-    // Validar se a senha atual é igual à nova
-    if (passwordFormData.currentPassword === passwordFormData.newPassword) {
-      setPasswordMessage({
-        type: "error",
-        text: "A nova senha deve ser diferente da atual",
-      });
-      return false;
-    }
-
-    return true;
-  };
-
-  const handlePasswordSubmit = async (e) => {
-    e.preventDefault();
-    setPasswordMessage({ type: "", text: "" });
-
-    if (!validatePasswordForm()) {
-      return;
-    }
-
-    setIsChangingPassword(true);
-
-    try {
-      await changeUserPassword(
-        user.id,
-        passwordFormData.currentPassword,
-        passwordFormData.newPassword,
-      );
-
-      setPasswordMessage({
-        type: "success",
-        text: "Senha alterada com sucesso!",
-      });
-
-      // Limpar formulário
-      setPasswordFormData({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
-
-      // Fechar modal após 2 segundos
-      setTimeout(() => {
-        setIsPasswordModalOpen(false);
-      }, 2000);
-    } catch (error) {
-      console.error("Erro ao alterar senha:", error);
-      const errorMessage = error.message || "Erro ao alterar senha";
-      setPasswordMessage({ type: "error", text: errorMessage });
-    } finally {
-      setIsChangingPassword(false);
-    }
-  };
-
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
-        <div className="text-white text-center">
-          <p className="text-xl">Carregando...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#07070f" }}>
+        <div className="relative w-10 h-10">
+          <div className="absolute inset-0 rounded-full" style={{ border: "2px solid rgba(99,102,241,0.15)" }} />
+          <div className="absolute inset-0 rounded-full animate-spin" style={{ border: "2px solid transparent", borderTopColor: "#818cf8" }} />
         </div>
       </div>
     );
   }
 
+  const initials = [user?.first_name, user?.last_name].filter(Boolean).map(n => n[0]).join("").toUpperCase() || user?.username?.[0]?.toUpperCase() || "?";
+  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.username;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-          Meu Perfil
-        </h1>
+    <>
+      <Head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+        <style>{darkStyles}</style>
+      </Head>
 
-        {/* Username */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Usuário
-          </label>
-          <input
-            type="text"
-            name="username"
-            value={formData.username}
-            onChange={handleInputChange}
-            disabled={!isEditing}
-            className={`w-full px-4 py-2 border border-gray-300 rounded-lg ${
-              isEditing
-                ? "bg-white text-gray-900 cursor-text"
-                : "bg-gray-100 text-gray-700 cursor-not-allowed"
-            }`}
-          />
-        </div>
+      <div className="min-h-screen relative overflow-hidden" style={{ background: "#07070f", fontFamily: "'DM Sans', sans-serif" }}>
+        {/* Dot grid */}
+        <div className="absolute inset-0" style={{
+          backgroundImage: "radial-gradient(circle, rgba(99,102,241,0.12) 1px, transparent 1px)",
+          backgroundSize: "44px 44px",
+          maskImage: "radial-gradient(ellipse 100% 60% at 50% 0%, black 40%, transparent 100%)",
+        }} />
 
-        {/* First Name */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nome
-          </label>
-          <input
-            type="text"
-            name="first_name"
-            value={formData.first_name}
-            onChange={handleInputChange}
-            disabled={!isEditing}
-            className={`w-full px-4 py-2 border border-gray-300 rounded-lg ${
-              isEditing
-                ? "bg-white text-gray-900 cursor-text"
-                : "bg-gray-100 text-gray-700 cursor-not-allowed"
-            }`}
-          />
-        </div>
-
-        {/* Last Name */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Sobrenome
-          </label>
-          <input
-            type="text"
-            name="last_name"
-            value={formData.last_name}
-            onChange={handleInputChange}
-            disabled={!isEditing}
-            className={`w-full px-4 py-2 border border-gray-300 rounded-lg ${
-              isEditing
-                ? "bg-white text-gray-900 cursor-text"
-                : "bg-gray-100 text-gray-700 cursor-not-allowed"
-            }`}
-          />
-        </div>
-
-        {/* Email */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email
-          </label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            disabled={!isEditing}
-            className={`w-full px-4 py-2 border border-gray-300 rounded-lg ${
-              isEditing
-                ? "bg-white text-gray-900 cursor-text"
-                : "bg-gray-100 text-gray-700 cursor-not-allowed"
-            }`}
-          />
-        </div>
-
-        {/* Message */}
-        {message.text && (
-          <div
-            className={`mb-4 p-3 rounded-lg text-sm font-medium ${
-              message.type === "success"
-                ? "bg-green-100 text-green-700"
-                : "bg-red-100 text-red-700"
-            }`}
-          >
-            {message.text}
+        {/* Top nav */}
+        <nav className="relative z-10 flex items-center justify-between px-6 py-4 mx-auto max-w-4xl">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }} />
+            <span className="font-semibold text-white text-sm">MyApp</span>
           </div>
-        )}
+          <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-xl transition-all duration-200" style={{ color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+            onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.75)"}
+            onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.45)"}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h6a2 2 0 012 2v1" />
+            </svg>
+            Sair
+          </button>
+        </nav>
 
-        {/* Buttons */}
-        <div className="space-y-3">
-          {/* Top Row - Edit/Save/Cancel */}
-          <div className="flex gap-2">
-            {isEditing ? (
-              <>
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
+        {/* Content */}
+        <div className="relative z-10 max-w-4xl mx-auto px-6 py-8">
+
+          {/* Profile header */}
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-14 h-14 rounded-2xl flex-shrink-0 overflow-hidden" style={!user?.avatar_url ? { background: "linear-gradient(135deg, #6366f1, #8b5cf6)" } : {}}>
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-white font-bold text-lg">{initials}</div>
+              )}
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white" style={{ fontFamily: "'Syne', sans-serif" }}>{displayName}</h1>
+              <p className="text-sm" style={{ color: "rgba(255,255,255,0.35)" }}>{user?.email}</p>
+            </div>
+          </div>
+
+          {/* Card */}
+          <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-sm font-semibold text-white" style={{ fontFamily: "'Syne', sans-serif", letterSpacing: "0.03em" }}>Informações do Perfil</h2>
+              {!isEditing && (
+                <button onClick={handleEditToggle} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all duration-200" style={{ color: "#818cf8", background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(99,102,241,0.18)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(99,102,241,0.1)"}
                 >
-                  {isSaving ? "Salvando..." : "Salvar"}
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  Editar
                 </button>
-                <button
-                  onClick={handleEditToggle}
-                  disabled={isSaving}
-                  className="flex-1 bg-gray-400 hover:bg-gray-500 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
-                >
+              )}
+            </div>
+
+            {/* Feedback */}
+            {message.text && (
+              <div className="mb-5 px-4 py-3 rounded-xl text-sm" style={message.type === "success"
+                ? { background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", color: "#86efac" }
+                : { background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#fca5a5" }}>
+                {message.text}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="dark-label">Nome</label>
+                <input type="text" name="first_name" value={formData.first_name} onChange={handleInputChange} disabled={!isEditing} className="dark-input" placeholder="Seu nome" />
+              </div>
+              <div>
+                <label className="dark-label">Sobrenome</label>
+                <input type="text" name="last_name" value={formData.last_name} onChange={handleInputChange} disabled={!isEditing} className="dark-input" placeholder="Seu sobrenome" />
+              </div>
+              <div>
+                <label className="dark-label">Usuário</label>
+                <input type="text" name="username" value={formData.username} onChange={handleInputChange} disabled={!isEditing} className="dark-input" placeholder="Username" />
+              </div>
+              <div>
+                <label className="dark-label">Email</label>
+                <input type="email" name="email" value={formData.email} onChange={handleInputChange} disabled={!isEditing} className="dark-input" placeholder="seu@email.com" />
+              </div>
+            </div>
+
+            {isEditing && (
+              <div className="flex gap-3 mt-5">
+                <button onClick={handleSave} disabled={isSaving} className="flex-1 py-2.5 rounded-xl font-medium text-sm text-white transition-all duration-200" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+                  {isSaving ? "Salvando..." : "Salvar alterações"}
+                </button>
+                <button onClick={handleEditToggle} disabled={isSaving} className="flex-1 py-2.5 rounded-xl font-medium text-sm transition-all duration-200" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}>
                   Cancelar
                 </button>
-              </>
-            ) : (
-              <button
-                onClick={handleEditToggle}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
-              >
-                Editar
-              </button>
+              </div>
             )}
-            <button
-              onClick={handleLogout}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
-            >
-              Sair
-            </button>
           </div>
 
-          {/* Change Password Button */}
-          <button
-            onClick={() => setIsPasswordModalOpen(true)}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
-          >
-            Alterar Senha
-          </button>
+          {/* Security card */}
+          <div className="rounded-2xl p-6 mt-4" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-white mb-0.5" style={{ fontFamily: "'Syne', sans-serif" }}>Segurança</h2>
+                <p className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>Gerencie sua senha de acesso</p>
+              </div>
+              <button onClick={() => setIsPasswordModalOpen(true)} className="text-xs px-4 py-2 rounded-xl font-medium transition-all duration-200" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.1)" }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.09)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+              >
+                Alterar senha
+              </button>
+            </div>
+          </div>
+
         </div>
-
-        {/* Password Modal */}
-        <ChangePasswordModal
-          isOpen={isPasswordModalOpen}
-          userId={user.id}
-          onClose={() => setIsPasswordModalOpen(false)}
-        />
       </div>
-    </div>
-  );
-}
 
-/**
- * Modal para alterar senha do usuário
- */
-function ChangePasswordModal({ isOpen, userId, onClose }) {
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [passwordMessage, setPasswordMessage] = useState({
-    type: "",
-    text: "",
-  });
-  const [passwordFormData, setPasswordFormData] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
-
-  const handlePasswordInputChange = (e) => {
-    const { name, value } = e.target;
-    setPasswordFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const validatePasswordForm = () => {
-    // Validar campos vazios
-    if (!passwordFormData.currentPassword) {
-      setPasswordMessage({ type: "error", text: "Informe sua senha atual" });
-      return false;
-    }
-
-    if (!passwordFormData.newPassword) {
-      setPasswordMessage({ type: "error", text: "Informe a nova senha" });
-      return false;
-    }
-
-    if (!passwordFormData.confirmPassword) {
-      setPasswordMessage({ type: "error", text: "Confirme a nova senha" });
-      return false;
-    }
-
-    // Validar comprimento mínimo
-    if (passwordFormData.newPassword.length < 8) {
-      setPasswordMessage({
-        type: "error",
-        text: "A nova senha deve ter pelo menos 8 caracteres",
-      });
-      return false;
-    }
-
-    // Validar se as senhas batem
-    if (passwordFormData.newPassword !== passwordFormData.confirmPassword) {
-      setPasswordMessage({
-        type: "error",
-        text: "As novas senhas não correspondem",
-      });
-      return false;
-    }
-
-    // Validar se a senha atual é igual à nova
-    if (passwordFormData.currentPassword === passwordFormData.newPassword) {
-      setPasswordMessage({
-        type: "error",
-        text: "A nova senha deve ser diferente da atual",
-      });
-      return false;
-    }
-
-    return true;
-  };
-
-  const handlePasswordSubmit = async (e) => {
-    e.preventDefault();
-    setPasswordMessage({ type: "", text: "" });
-
-    if (!validatePasswordForm()) {
-      return;
-    }
-
-    setIsChangingPassword(true);
-
-    try {
-      await changeUserPassword(
-        userId,
-        passwordFormData.currentPassword,
-        passwordFormData.newPassword,
-      );
-
-      setPasswordMessage({
-        type: "success",
-        text: "Senha alterada com sucesso!",
-      });
-
-      // Limpar formulário
-      setPasswordFormData({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
-
-      // Fechar modal após 2 segundos
-      setTimeout(() => {
-        onClose();
-      }, 2000);
-    } catch (error) {
-      console.error("Erro ao alterar senha:", error);
-      const errorMessage = error.message || "Erro ao alterar senha";
-      setPasswordMessage({ type: "error", text: errorMessage });
-    } finally {
-      setIsChangingPassword(false);
-    }
-  };
-
-  const handleCloseModal = () => {
-    setPasswordFormData({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    setPasswordMessage({ type: "", text: "" });
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8 max-h-screen overflow-y-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Alterar Senha</h2>
-          <p className="text-gray-600 text-sm mt-2">
-            Altere sua senha de forma segura
-          </p>
-        </div>
-
-        {/* Message */}
-        {passwordMessage.text && (
-          <div
-            className={`mb-6 p-4 rounded-lg text-sm font-medium ${
-              passwordMessage.type === "success"
-                ? "bg-green-100 text-green-700"
-                : "bg-red-100 text-red-700"
-            }`}
-          >
-            {passwordMessage.text}
-          </div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handlePasswordSubmit} className="space-y-5">
-          {/* Senha Atual */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Senha Atual
-            </label>
-            <input
-              type="password"
-              name="currentPassword"
-              value={passwordFormData.currentPassword}
-              onChange={handlePasswordInputChange}
-              placeholder="Digite sua senha atual"
-              disabled={isChangingPassword}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-            />
-          </div>
-
-          {/* Nova Senha */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nova Senha
-            </label>
-            <input
-              type="password"
-              name="newPassword"
-              value={passwordFormData.newPassword}
-              onChange={handlePasswordInputChange}
-              placeholder="Digite sua nova senha"
-              disabled={isChangingPassword}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-            />
-            <p className="text-xs text-gray-500 mt-1">Mínimo de 8 caracteres</p>
-          </div>
-
-          {/* Confirmar Nova Senha */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Confirmar Nova Senha
-            </label>
-            <input
-              type="password"
-              name="confirmPassword"
-              value={passwordFormData.confirmPassword}
-              onChange={handlePasswordInputChange}
-              placeholder="Confirme sua nova senha"
-              disabled={isChangingPassword}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-            />
-          </div>
-
-          {/* Buttons */}
-          <div className="flex gap-2 mt-6">
-            <button
-              type="submit"
-              disabled={isChangingPassword}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
-            >
-              {isChangingPassword ? "Alterando..." : "Alterar"}
-            </button>
-            <button
-              type="button"
-              onClick={handleCloseModal}
-              disabled={isChangingPassword}
-              className="flex-1 bg-gray-400 hover:bg-gray-500 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      <ChangePasswordModal isOpen={isPasswordModalOpen} userId={user?.id} onClose={() => setIsPasswordModalOpen(false)} />
+    </>
   );
 }
