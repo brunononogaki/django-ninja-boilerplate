@@ -289,6 +289,10 @@ from .schemas import (
 
 @router.post('users', response=UserWithGroupsSchema, summary='Create user', description='Create a new user', auth=None)
 def create_users(request, data: UserCreateSchema):
+    try:
+        validate_password(data.password)
+    except DjangoValidationError as e:
+        raise ValidationError(', '.join(e.messages))
     # Pre-create validation: check username and email uniqueness
     if User.objects.filter(username=data.username).exists():
         logger.warning(f'Attempt to create user with existing username: {data.username}')
@@ -357,6 +361,19 @@ def test_create_users_duplicated_email(client):
     }
     response = client.post('/api/v1/users', data=json.dumps(user_payload), content_type='application/json')
     assert response.status_code == HTTPStatus.CONFLICT
+
+
+@pytest.mark.django_db
+def test_create_users_weak_password(client):
+    user_payload = {
+        'username': 'weakuser',
+        'first_name': 'Weak',
+        'last_name': 'User',
+        'email': 'weak@test.com',
+        'password': '123',
+    }
+    response = client.post('/api/v1/users', data=json.dumps(user_payload), content_type='application/json')
+    assert response.status_code == HTTPStatus.BAD_REQUEST
 ```
 
 ### Delete
@@ -442,6 +459,14 @@ def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
         raise NotFoundError('User not found')
 
     updated_fields = payload.dict(exclude_unset=True)
+
+    if 'username' in updated_fields:
+        if User.objects.filter(username=updated_fields['username']).exclude(id=id).exists():
+            raise ConflictError('Username already exists')
+    if 'email' in updated_fields:
+        if User.objects.filter(email=updated_fields['email']).exclude(id=id).exists():
+            raise ConflictError('Email already exists')
+
     for field, value in updated_fields.items():
         setattr(user, field, value)
 

@@ -206,6 +206,23 @@ def test_create_users_duplicated_email(admin_client):
 
 
 @pytest.mark.django_db
+def test_create_users_weak_password(client):
+    user_payload = {
+        'username': 'weakuser',
+        'first_name': 'Weak',
+        'last_name': 'User',
+        'email': 'weak@test.com',
+        'password': '123',  # NOSONAR — intentionally weak password to test validation
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
 def test_delete_user(admin_client):
     user_payload = {
         'username': 'admin_new',
@@ -343,6 +360,32 @@ def test_patch_user_to_other_user_fail(non_admin_client):
         content_type='application/json',
     )
     assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.django_db
+def test_patch_user_duplicate_username(admin_client, non_admin_client):
+    User = get_user_model()  # NOSONAR
+    non_admin = User.objects.get(username='new_user_non_admin')
+
+    response = admin_client.patch(
+        f'/api/v1/users/{non_admin.id}',
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER')}),
+        content_type='application/json',
+    )
+    assert response.status_code == HTTPStatus.CONFLICT
+
+
+@pytest.mark.django_db
+def test_patch_user_duplicate_email(admin_client, non_admin_client):
+    User = get_user_model()  # NOSONAR
+    non_admin = User.objects.get(username='new_user_non_admin')
+
+    response = admin_client.patch(
+        f'/api/v1/users/{non_admin.id}',
+        data=json.dumps({'email': config('DJANGO_ADMIN_EMAIL')}),
+        content_type='application/json',
+    )
+    assert response.status_code == HTTPStatus.CONFLICT
 
 
 @pytest.mark.django_db

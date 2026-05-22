@@ -141,8 +141,6 @@ services:
       - no-new-privileges:true
     tmpfs:
       - /tmp
-    volumes:
-      - ../:/app
     environment:
       - DJANGO_SETTINGS_MODULE=myapi.settings
     logging:
