@@ -19,8 +19,7 @@ COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
 
 COPY . .
 
-ARG SECRET_KEY
-RUN SECRET_KEY=${SECRET_KEY} python manage.py collectstatic --noinput
+RUN SECRET_KEY=django-insecure-collectstatic-build-only python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
