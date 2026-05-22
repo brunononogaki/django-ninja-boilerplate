@@ -22,7 +22,7 @@ jobs:
           skip-dirs: myapi/core/tests,myapi/users/tests
 
       - name: Build Docker image
-        run: docker build -f infra/Dockerfile-pro -t myapi:pr .
+        run: docker build -f infra/Dockerfile-pro --build-arg SECRET_KEY=dummy-build-only -t myapi:pr .
 
       - name: Scan Docker image
         uses: aquasecurity/trivy-action@master

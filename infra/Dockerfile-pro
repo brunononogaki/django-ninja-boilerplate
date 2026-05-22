@@ -15,7 +15,8 @@ RUN pip install --no-cache-dir poetry && poetry config virtualenvs.create false 
 COPY . .
 
 # Collect static files
-RUN python manage.py collectstatic --noinput
+ARG SECRET_KEY
+RUN SECRET_KEY=${SECRET_KEY} python manage.py collectstatic --noinput
 
 # Expose Uvicorn port
 EXPOSE 8000
