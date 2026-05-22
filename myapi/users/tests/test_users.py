@@ -206,6 +206,23 @@ def test_create_users_duplicated_email(admin_client):
 
 
 @pytest.mark.django_db
+def test_create_users_weak_password(client):
+    user_payload = {
+        'username': 'weakuser',
+        'first_name': 'Weak',
+        'last_name': 'User',
+        'email': 'weak@test.com',
+        'password': '123',
+    }
+    response = client.post(
+        '/api/v1/users',
+        data=json.dumps(user_payload),
+        content_type='application/json',
+    )
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+@pytest.mark.django_db
 def test_delete_user(admin_client):
     user_payload = {
         'username': 'admin_new',

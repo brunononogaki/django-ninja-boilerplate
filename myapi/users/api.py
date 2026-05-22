@@ -103,6 +103,10 @@ def get_user_detail_by_id(request, id: uuid.UUID):
 @router.post('users', response=UserWithGroupsSchema, summary='Create user', description='Create a new user', auth=None)
 def create_users(request, data: UserCreateSchema):
     check_rate_limit(request, group='register')
+    try:
+        validate_password(data.password)
+    except DjangoValidationError as e:
+        raise ValidationError(', '.join(e.messages))
     # Pre-create validation: check username and email uniqueness
     if User.objects.filter(username=data.username).exists():
         logger.warning(f'Attempt to create user with existing username: {data.username}')
