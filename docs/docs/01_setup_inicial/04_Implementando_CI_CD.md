@@ -275,7 +275,8 @@ E agora vamos criar o nosso workflow de Deploy em uma VPS da Hostinger. Eis o qu
     Para gerar uma chave SSH para um usuário, você pode fazer o seguinte:
     ```bash
     ssh-keygen -t rsa -b 4096 -f ~/.ssh/vps_key
-    ssh-copy-id -i ~/.ssh/vps_key.pub root@<IP_SERVIDOR>
+    
+    <IP_SERVIDOR>
     ```
     Nessa pasta serão criados os arquivos vps_key (chave privada) e vps_key.pub (chave pública). A chave pública foi copiada para dentro do servidor, e a chave privada é o que usaremos para criar as Secrets no GitHub para autenticação no servidor.
 
@@ -385,6 +386,136 @@ CONTAINER ID   IMAGE                    COMMAND                  CREATED        
     
 
 
+## Adicionando Scans de Segurança
+
+Com o pipeline funcionando, vamos adicionar uma camada de segurança automática em cada Pull Request. Usaremos três ferramentas complementares:
+
+| Ferramenta | O que analisa | Configuração |
+|---|---|---|
+| **Trivy** | CVEs em dependências e na imagem Docker | Workflow no repositório |
+| **Semgrep** | Vulnerabilidades no código-fonte (SAST) | GitHub App (portal) |
+| **SonarCloud** | Qualidade e security hotspots no código | GitHub App (portal) |
+
+### Trivy
+
+O [Trivy](https://trivy.dev/) verifica CVEs em dependências Python (`poetry.lock`), pacotes da imagem Docker, e secrets acidentalmente commitados.
+
+Antes de criar o workflow, atualize o `Dockerfile-pro` para usar um build multi-stage. Isso reduz drasticamente o número de CVEs na imagem final, porque o stage de build (que precisa de `build-essential`, `gcc`, etc.) é descartado — apenas as libs necessárias em runtime são copiadas:
+
+```Dockerfile title="./infra/Dockerfile-pro"
+FROM python:3.13-slim AS builder
+
+RUN apt-get update && apt-get install -y build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY pyproject.toml poetry.lock ./
+RUN pip install --no-cache-dir poetry && poetry config virtualenvs.create false && poetry install --no-interaction --no-ansi --only main
+
+
+FROM python:3.13-slim
+
+RUN apt-get update && apt-get install -y libpq5 && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
+
+COPY . .
+
+RUN SECRET_KEY=django-insecure-collectstatic-build-only python manage.py collectstatic --noinput
+
+EXPOSE 8000
+
+CMD ["uvicorn", "myapi.asgi:application", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+!!! note
+
+    O `collectstatic` precisa da variável `SECRET_KEY` setada para o Django inicializar, mas não usa o valor para nada criptográfico. Por isso usamos um dummy com o prefixo `django-insecure-` diretamente no `RUN`, sem expor nenhum segredo real na imagem. A `SECRET_KEY` de produção é injetada em runtime via `env_file`.
+
+Agora crie o workflow:
+
+```yaml title="./.github/workflows/trivy.yaml"
+name: Trivy Security Scan
+
+on: pull_request
+
+jobs:
+  trivy:
+    name: trivy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Scan dependencies (poetry.lock)
+        uses: aquasecurity/trivy-action@314ff8b43182423b84c50b1670b0e10f858f2d98
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          ignore-unfixed: true
+          skip-dirs: myapi/core/tests,myapi/users/tests
+
+      - name: Build Docker image
+        run: docker build -f infra/Dockerfile-pro -t myapi:pr .
+
+      - name: Scan Docker image
+        uses: aquasecurity/trivy-action@314ff8b43182423b84c50b1670b0e10f858f2d98
+        with:
+          scan-type: image
+          image-ref: myapi:pr
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          ignore-unfixed: true
+```
+
+Decisões importantes:
+
+- **`ignore-unfixed: true`** — o workflow só falha quando existe uma versão corrigida disponível. CVEs sem fix (dependências transitivas do SO sem patch publicado) não bloqueiam o build, já que não há nenhuma ação possível.
+- **SHA completo no `uses`** — em vez de `@master`, usamos o SHA completo do commit. Isso evita supply chain attacks onde uma tag mutável poderia apontar para código malicioso.
+- **`skip-dirs`** — os diretórios de teste são excluídos do scan de secrets para evitar falsos positivos em fixtures e dados de teste.
+
+### Semgrep
+
+O [Semgrep](https://semgrep.dev/) faz análise estática (SAST) do código-fonte, identificando vulnerabilidades como SQL injection, XSS, uso inseguro de funções, e padrões problemáticos específicos de Django.
+
+A integração com o GitHub é feita diretamente pelo portal, sem necessidade de adicionar um workflow ao repositório:
+
+1. Acesse [semgrep.dev](https://semgrep.dev) e crie uma conta
+2. Vá em **Settings → Source Code Managers** e conecte sua conta do GitHub
+3. Selecione o repositório desejado
+4. O Semgrep vai automaticamente criar um check em cada Pull Request
+
+A partir daí, a cada PR o Semgrep roda as regras do ruleset configurado (o `p/django` já cobre os principais vetores de ataque para projetos Django) e reporta os findings diretamente na interface do GitHub.
+
+### SonarCloud
+
+O [SonarCloud](https://sonarcloud.io) analisa qualidade de código e security hotspots — padrões que merecem revisão manual por terem potencial de risco (uso de `eval`, configurações inseguras, etc.) — além de duplicação de código e cobertura de testes.
+
+Assim como o Semgrep, a configuração é feita pelo portal:
+
+1. Acesse [sonarcloud.io](https://sonarcloud.io) e faça login com sua conta do GitHub
+2. Clique em **+** → **Analyze new project** e selecione o repositório
+3. Escolha o método de análise **Automatic Analysis**
+4. O SonarCloud vai criar um check automático em cada Pull Request
+
+!!! tip
+
+    O SonarCloud classifica os findings em **Bugs**, **Vulnerabilities**, **Code Smells** e **Security Hotspots**. Os Hotspots não são necessariamente vulnerabilidades — eles precisam de revisão humana para determinar se representam risco real no contexto do projeto. Você pode marcá-los como **Safe** ou **Fixed** diretamente no portal.
+
+### Adicionando os checks como obrigatórios
+
+Por fim, adicione os três como status checks obrigatórios no GitHub:
+
+- Settings → Branches → branch-main-protection → Require status checks to pass
+    - Adicione os checks: `trivy`, `Semgrep OSS Scan`, `SonarCloud Code Analysis`
+
 !!! success
 
-    Sucesso!!! Nosso CI/CD ta prontinho, com testes automatizados e deploy para produção!
+    Sucesso!!! Nosso CI/CD ta prontinho, com testes automatizados, scan de segurança e deploy para produção!
