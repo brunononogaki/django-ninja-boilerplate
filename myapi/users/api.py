@@ -10,6 +10,7 @@ from ninja.responses import Response
 
 from ..core.auth import AdminAuth, JWTAuth, OwnerOrAdminAuth
 from ..core.exceptions import ConflictError, NotFoundError, ServiceError, ValidationError
+from ..core.ratelimit import check_rate_limit
 from .schemas import (
     PasswordResetConfirmSchema,
     PasswordResetRequestSchema,
@@ -101,6 +102,7 @@ def get_user_detail_by_id(request, id: uuid.UUID):
 
 @router.post('users', response=UserWithGroupsSchema, summary='Create user', description='Create a new user', auth=None)
 def create_users(request, data: UserCreateSchema):
+    check_rate_limit(request, group='register')
     # Pre-create validation: check username and email uniqueness
     if User.objects.filter(username=data.username).exists():
         logger.warning(f'Attempt to create user with existing username: {data.username}')
@@ -244,6 +246,7 @@ def activate_user(request, token_id: uuid.UUID):
     auth=None,
 )
 def resend_activation(request, token_id: uuid.UUID):
+    check_rate_limit(request, group='resend-activation', rate='3/m')
     user = verify_activation_token(str(token_id), is_resend=True)
 
     # Send new activation email (which creates a new token)
@@ -269,6 +272,7 @@ def resend_activation(request, token_id: uuid.UUID):
     auth=None,
 )
 def request_password_reset(request, data: PasswordResetRequestSchema):
+    check_rate_limit(request, group='password-reset', rate='3/m')
     try:
         user = User.objects.get(email=data.email)
     except User.DoesNotExist:

@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 # Detectar automaticamente se é produção ou desenvolvimento
 BACKEND_FQDN = config('BACKEND_FQDN', default='localhost:8000')
@@ -37,9 +37,17 @@ if IS_PRODUCTION:
     USE_X_FORWARDED_PROTO = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 else:
     USE_X_FORWARDED_HOST = False
     USE_X_FORWARDED_PROTO = False
+
+# Security headers (dev + prod)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+X_FRAME_OPTIONS = 'DENY'
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
@@ -83,6 +91,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # CORS
     'corsheaders.middleware.CorsMiddleware',
+    # Security headers extras
+    'myapi.core.middleware.SecurityHeadersMiddleware',
 ]
 
 ROOT_URLCONF = 'myapi.urls'

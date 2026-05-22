@@ -35,6 +35,10 @@ services:
       - "traefik.http.routers.myapi.rule=Host(`${BACKEND_FQDN}`)"
       - "traefik.http.routers.myapi.entrypoints=websecure"
       - "traefik.http.routers.myapi.tls=true"
+      - "traefik.http.routers.myapi.middlewares=myapi-ratelimit"
+      - "traefik.http.middlewares.myapi-ratelimit.rateLimit.average=100"
+      - "traefik.http.middlewares.myapi-ratelimit.rateLimit.burst=50"
+      - "traefik.http.middlewares.myapi-ratelimit.rateLimit.period=1m"
       - "traefik.http.services.myapi.loadbalancer.server.port=8000"
       - "traefik.docker.network=my-network"
     networks:

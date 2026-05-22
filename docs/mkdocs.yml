@@ -31,6 +31,8 @@ nav:
       - 09. Exibindo o Avatar do Google no perfil: 04_frontend_login/09_Avatar_Google.md
   - Apêndice:
       - 01. Configurando o Traefik: Appendix/01_Configurando_o_Traefik.md
+      - 02. Rate Limiting: Appendix/02_Rate_Limiting.md
+      - 03. Headers de Segurança: Appendix/03_Headers_de_Seguranca.md
 theme:
   name: material
   palette:

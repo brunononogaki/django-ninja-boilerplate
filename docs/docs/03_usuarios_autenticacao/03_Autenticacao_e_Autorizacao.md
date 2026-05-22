@@ -496,12 +496,8 @@ class OwnerOrAdminAuth(JWTAuth):
         if not user:
             return None
 
-        target_identifier = None
-        try:
-            # Pega o ID ou username do último segmento do path
-            target_identifier = str(request.path).split('/')[-1]
-        except Exception:
-            target_identifier = None
+        # resolver_match.kwargs contém os parâmetros nomeados da URL já resolvidos pelo Django
+        target_identifier = str(request.resolver_match.kwargs.get('id', ''))
 
         # Se não há target_identifier, só admins tem acesso
         if not target_identifier:
@@ -511,8 +507,8 @@ class OwnerOrAdminAuth(JWTAuth):
         if getattr(user, 'is_staff', False):
             return user
 
-        # Para não-admins, verifica se é o próprio usuário (por ID ou username)
-        if str(user.id) == str(target_identifier) or user.username == target_identifier:
+        # Para não-admins, verifica se é o próprio usuário
+        if str(user.id) == target_identifier:
             return user
 
         return None
@@ -730,3 +726,178 @@ def test_get_current_user_non_admin(client, create_non_admin_access_token):
 !!! success
 
     Com isso a gente termina a Autenticação e Autorização do CRUD de Users
+
+---
+
+## Rotação de Refresh Token
+
+### O problema
+
+No fluxo atual, o refresh token é um JWT **stateless**: não há registro no banco de que ele foi emitido, e o mesmo token pode ser usado quantas vezes quiser durante os 30 dias de validade. Se um atacante roubar o refresh token do cookie de um usuário, ele consegue manter acesso indefinidamente — sem que o usuário ou o servidor consiga perceber.
+
+### A solução: rotação com `jti` + denylist
+
+A rotação funciona assim:
+
+1. Cada refresh token gerado recebe um **`jti`** (JWT ID) — um UUID único no payload
+2. Ao usar o token em `POST /refresh`, o `jti` é registrado em uma tabela de denylist no banco
+3. Se o mesmo token for apresentado novamente, o `jti` já estará na denylist → request rejeitado
+4. A cada chamada ao `/refresh`, entradas já expiradas são deletadas da denylist (limpeza oportunista)
+
+Com isso, cada refresh token só pode ser usado **uma única vez**. Um token roubado e já utilizado pelo atacante seria detectado quando o usuário legítimo tentar um novo refresh — a sessão seria encerrada.
+
+### Criando o modelo `RefreshTokenDenylist`
+
+No arquivo `./myapi/core/models.py`, vamos criar o modelo que guardará os `jti` dos tokens já utilizados:
+
+```python title="./myapi/core/models.py"
+import uuid
+from datetime import datetime, timezone
+
+from django.db import models
+
+
+class RefreshTokenDenylist(models.Model):
+    jti = models.UUIDField(unique=True, db_index=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        indexes = [models.Index(fields=['expires_at'])]
+
+    @classmethod
+    def cleanup_expired(cls):
+        cls.objects.filter(expires_at__lt=datetime.now(tz=timezone.utc)).delete()
+```
+
+O índice em `expires_at` torna o `DELETE` de entradas expiradas eficiente mesmo com a tabela crescendo.
+
+Depois de criar o modelo, rode:
+
+```bash
+python manage.py makemigrations core
+python manage.py migrate
+```
+
+### Alterando o `auth.py`
+
+Duas mudanças em `./myapi/core/auth.py`:
+
+**`create_token`** — adiciona o `jti` no payload do refresh token:
+
+```python title="./myapi/core/auth.py" hl_lines="1 12-13"
+from uuid import uuid4
+
+def create_token(user):
+    now = datetime.utcnow()
+    access_token = jwt.encode(
+        {'user_id': str(user.id), 'exp': now + ACCESS_LIFETIME, 'type': 'access'},
+        settings.SECRET_KEY,
+        algorithm=ALGO,
+    )
+    refresh_token = jwt.encode(
+        {
+            'user_id': str(user.id),
+            'exp': now + REFRESH_LIFETIME,
+            'type': 'refresh',
+            'jti': str(uuid4()),   # <= UUID único por token
+        },
+        settings.SECRET_KEY,
+        algorithm=ALGO,
+    )
+    return {'access_token': access_token, 'refresh_token': refresh_token}
+```
+
+**`verify_refresh_token`** — verifica a denylist, registra o `jti` usado e limpa entradas expiradas:
+
+```python title="./myapi/core/auth.py"
+from datetime import datetime, timezone
+
+from .models import RefreshTokenDenylist
+
+def verify_refresh_token(token):
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGO])
+        if payload.get('type') != 'refresh':
+            return None
+
+        jti = payload.get('jti')
+        exp = payload.get('exp')
+
+        # Limpeza oportunista: remove entradas expiradas do banco a cada chamada
+        RefreshTokenDenylist.cleanup_expired()
+
+        # Rejeita se o jti já foi usado (token reutilizado ou roubado)
+        if RefreshTokenDenylist.objects.filter(jti=jti).exists():
+            return None
+
+        # Registra o jti como utilizado
+        RefreshTokenDenylist.objects.create(
+            jti=jti,
+            expires_at=datetime.fromtimestamp(exp, tz=timezone.utc),
+        )
+
+        user_id = payload.get('user_id')
+        return User.objects.get(id=user_id)
+
+    except jwt.ExpiredSignatureError:
+        return None
+    except Exception:
+        return None
+```
+
+!!! note
+
+    O endpoint `POST /refresh` em `./myapi/core/api.py` **não precisa de nenhuma alteração** — ele já chama `verify_refresh_token` → `create_token`. A lógica de rotação fica inteiramente nas funções do `auth.py`.
+
+### Testes
+
+Vamos adicionar dois novos testes em `./myapi/core/tests/test_auth.py`:
+
+```python title="./myapi/core/tests/test_auth.py"
+@pytest.mark.django_db
+def test_refresh_token_rotation(client):
+    """Um refresh token só pode ser usado uma vez."""
+    client.post(
+        '/api/v1/login',
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
+    )
+
+    # Primeiro refresh: deve funcionar
+    response = client.post('/api/v1/refresh')
+    assert response.status_code == HTTPStatus.OK
+
+    # Segundo refresh com o mesmo cookie (token já usado): deve falhar
+    response = client.post('/api/v1/refresh')
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.django_db
+def test_refresh_token_cleanup(client):
+    """Entradas expiradas são removidas da denylist a cada chamada ao /refresh."""
+    from myapi.core.models import RefreshTokenDenylist
+    from datetime import datetime, timezone, timedelta
+    import uuid
+
+    # Cria uma entrada já expirada na denylist manualmente
+    RefreshTokenDenylist.objects.create(
+        jti=uuid.uuid4(),
+        expires_at=datetime.now(tz=timezone.utc) - timedelta(days=1),
+    )
+    assert RefreshTokenDenylist.objects.count() == 1
+
+    # Faz login e usa o /refresh — deve limpar a entrada expirada
+    client.post(
+        '/api/v1/login',
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
+    )
+    client.post('/api/v1/refresh')
+
+    # A entrada expirada deve ter sido removida; apenas o jti do refresh atual existe
+    assert RefreshTokenDenylist.objects.count() == 1
+```
+
+!!! success
+
+    Com a rotação ativa, cada refresh token é válido para **um único uso**. Um token roubado que já foi utilizado pelo atacante será detectado na próxima tentativa legítima, encerrando a sessão comprometida.

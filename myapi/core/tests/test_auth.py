@@ -1,12 +1,15 @@
 import json
-from datetime import timedelta
+import uuid
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 
 import pytest
 from decouple import config
 from django.contrib.auth import get_user_model
-from django.utils import timezone
+from django.utils import timezone as django_timezone
 from freezegun import freeze_time
+
+from myapi.core.models import RefreshTokenDenylist
 
 User = get_user_model()
 
@@ -119,7 +122,7 @@ def test_logout_clears_cookies(client):
 
 @pytest.mark.django_db
 def test_refresh_token_success(client):
-    initial_time = timezone.now()
+    initial_time = django_timezone.now()
 
     client.post(
         '/api/v1/login',
@@ -147,7 +150,7 @@ def test_refresh_token_expired(client):
         content_type='application/json',
     )
 
-    with freeze_time(timezone.now() + timedelta(days=31)):
+    with freeze_time(django_timezone.now() + timedelta(days=31)):
         response = client.post('/api/v1/refresh')
         assert response.status_code == HTTPStatus.UNAUTHORIZED
         assert 'Invalid or expired refresh token' in response.json()['message']
@@ -193,3 +196,43 @@ def test_social_token_success(client):
 def test_social_token_not_authenticated(client):
     response = client.post('/api/v1/social-token')
     assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.django_db
+def test_refresh_token_rotation(client):
+    """Um refresh token só pode ser usado uma vez."""
+    client.post(
+        '/api/v1/login',
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
+    )
+
+    original_token = client.cookies['refresh_token'].value
+
+    response = client.post('/api/v1/refresh')
+    assert response.status_code == HTTPStatus.OK
+
+    # Força o envio do token original (já usado) — o client atualizou o cookie automaticamente
+    client.cookies['refresh_token'] = original_token
+
+    response = client.post('/api/v1/refresh')
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+@pytest.mark.django_db
+def test_refresh_token_cleanup(client):
+    """Entradas expiradas são removidas da denylist a cada chamada ao /refresh."""
+    RefreshTokenDenylist.objects.create(
+        jti=uuid.uuid4(),
+        expires_at=datetime.now(tz=timezone.utc) - timedelta(days=1),
+    )
+    assert RefreshTokenDenylist.objects.count() == 1
+
+    client.post(
+        '/api/v1/login',
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER'), 'password': config('DJANGO_ADMIN_PASSWORD')}),
+        content_type='application/json',
+    )
+    client.post('/api/v1/refresh')
+
+    assert RefreshTokenDenylist.objects.count() == 1
