@@ -212,7 +212,7 @@ def test_create_users_weak_password(client):
         'first_name': 'Weak',
         'last_name': 'User',
         'email': 'weak@test.com',
-        'password': '123',
+        'password': '123',  # NOSONAR — intentionally weak password to test validation
     }
     response = client.post(
         '/api/v1/users',
@@ -364,7 +364,7 @@ def test_patch_user_to_other_user_fail(non_admin_client):
 
 @pytest.mark.django_db
 def test_patch_user_duplicate_username(admin_client, non_admin_client):
-    User = get_user_model()
+    User = get_user_model()  # NOSONAR
     non_admin = User.objects.get(username='new_user_non_admin')
 
     response = admin_client.patch(
@@ -377,7 +377,7 @@ def test_patch_user_duplicate_username(admin_client, non_admin_client):
 
 @pytest.mark.django_db
 def test_patch_user_duplicate_email(admin_client, non_admin_client):
-    User = get_user_model()
+    User = get_user_model()  # NOSONAR
     non_admin = User.objects.get(username='new_user_non_admin')
 
     response = admin_client.patch(
