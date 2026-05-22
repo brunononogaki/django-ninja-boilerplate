@@ -1,0 +1,35 @@
+name: Trivy Security Scan
+
+on: pull_request
+
+jobs:
+  trivy:
+    name: trivy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Scan dependencies (poetry.lock)
+        uses: aquasecurity/trivy-action@314ff8b43182423b84c50b1670b0e10f858f2d98
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          ignore-unfixed: true
+          skip-dirs: myapi/core/tests,myapi/users/tests
+
+      - name: Build Docker image
+        run: docker build -f infra/Dockerfile-pro -t myapi:pr .
+
+      - name: Scan Docker image
+        uses: aquasecurity/trivy-action@314ff8b43182423b84c50b1670b0e10f858f2d98
+        with:
+          scan-type: image
+          image-ref: myapi:pr
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          ignore-unfixed: true
