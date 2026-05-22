@@ -363,6 +363,32 @@ def test_patch_user_to_other_user_fail(non_admin_client):
 
 
 @pytest.mark.django_db
+def test_patch_user_duplicate_username(admin_client, non_admin_client):
+    User = get_user_model()
+    non_admin = User.objects.get(username='new_user_non_admin')
+
+    response = admin_client.patch(
+        f'/api/v1/users/{non_admin.id}',
+        data=json.dumps({'username': config('DJANGO_ADMIN_USER')}),
+        content_type='application/json',
+    )
+    assert response.status_code == HTTPStatus.CONFLICT
+
+
+@pytest.mark.django_db
+def test_patch_user_duplicate_email(admin_client, non_admin_client):
+    User = get_user_model()
+    non_admin = User.objects.get(username='new_user_non_admin')
+
+    response = admin_client.patch(
+        f'/api/v1/users/{non_admin.id}',
+        data=json.dumps({'email': config('DJANGO_ADMIN_EMAIL')}),
+        content_type='application/json',
+    )
+    assert response.status_code == HTTPStatus.CONFLICT
+
+
+@pytest.mark.django_db
 def test_change_password_success(non_admin_client):
     """Test successful password change"""
     User = get_user_model()

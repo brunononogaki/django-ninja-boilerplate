@@ -459,6 +459,14 @@ def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
         raise NotFoundError('User not found')
 
     updated_fields = payload.dict(exclude_unset=True)
+
+    if 'username' in updated_fields:
+        if User.objects.filter(username=updated_fields['username']).exclude(id=id).exists():
+            raise ConflictError('Username already exists')
+    if 'email' in updated_fields:
+        if User.objects.filter(email=updated_fields['email']).exclude(id=id).exists():
+            raise ConflictError('Email already exists')
+
     for field, value in updated_fields.items():
         setattr(user, field, value)
 

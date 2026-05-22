@@ -173,8 +173,15 @@ def patch_user(request, id: uuid.UUID, payload: UserPatchSchema):
         logger.warning(f'Attempt to update non-existent user: {id}')
         raise NotFoundError('User not found')
 
-    # Create a dict based on the schema UserPatchSchema, but removing fields that were not in the payload
     updated_fields = payload.dict(exclude_unset=True)
+
+    if 'username' in updated_fields:
+        if User.objects.filter(username=updated_fields['username']).exclude(id=id).exists():
+            raise ConflictError('Username already exists')
+    if 'email' in updated_fields:
+        if User.objects.filter(email=updated_fields['email']).exclude(id=id).exists():
+            raise ConflictError('Email already exists')
+
     for field, value in updated_fields.items():
         setattr(user, field, value)
 
