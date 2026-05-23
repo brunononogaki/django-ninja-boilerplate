@@ -130,7 +130,7 @@ Com o Traefik configurado, basta adicionar `labels` nos containers das aplica√ß√
 ```yaml title="./infra/compose-pro.yaml" hl_lines="9-16"
 services:
   web:
-    container_name: django-ninja-prod
+    container_name: boilerplate_back
     build:
       context: ..
       dockerfile: infra/Dockerfile-pro
