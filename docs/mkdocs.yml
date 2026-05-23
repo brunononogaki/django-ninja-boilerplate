@@ -29,6 +29,10 @@ nav:
       - 07. Mudando a autenticação para evitar ataques de XSS: 04_frontend_login/07_Problema_de_XSS.md
       - 08. Configurando o Login do Google com django-allauth: 04_frontend_login/08_Configurando_Login_Google.md
       - 09. Exibindo o Avatar do Google no perfil: 04_frontend_login/09_Avatar_Google.md
+  - Celery e Redis (opcional):
+      - 01. Instalando o Redis: 05_Celery_Redis/01_Instalando_Redis.md
+      - 02. Instalando o Celery: 05_Celery_Redis/02_Instalando_Celery.md
+      - 03. Criando Tasks Assíncronas: 05_Celery_Redis/03_Criando_Tasks.md
   - Apêndice:
       - 01. Configurando o Traefik: Appendix/01_Configurando_o_Traefik.md
       - 02. Rate Limiting: Appendix/02_Rate_Limiting.md

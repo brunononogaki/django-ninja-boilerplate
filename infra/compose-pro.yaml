@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   database:
-    container_name: postgres-prod
+    container_name: boilerplate_database
     image: postgres:17.0
     env_file:
       - ../.env.production
@@ -24,7 +24,7 @@ services:
         max-file: "3"
 
   web:
-    container_name: django-ninja-prod
+    container_name: boilerplate_back
     build:
       context: ..
       dockerfile: infra/Dockerfile-pro

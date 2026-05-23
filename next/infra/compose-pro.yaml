@@ -7,7 +7,7 @@ services:
       dockerfile: infra/Dockerfile-pro
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-    container_name: frontend-prod
+    container_name: boilerplate_front
     expose:
       - "3000"
     restart: unless-stopped
