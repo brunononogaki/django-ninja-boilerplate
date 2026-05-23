@@ -28,6 +28,7 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile-pro
+      network: host
     env_file:
       - ../.env.production
     labels:
