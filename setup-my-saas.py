@@ -8,6 +8,7 @@ Uso:
 
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -195,10 +196,65 @@ def main():
 
     print("\n  " + "─" * 50)
     print(f"  Concluído! {total_files} arquivo(s) modificado(s).")
-    print(f"\n  Próximos passos:")
-    print(f"  1. Copie .env.production.example → .env.production e preencha os secrets")
-    print(f"  2. git add . && git commit -m 'chore: setup project {app_name}'")
+
+    # GitHub
+    criar_repo = input("\n  Criar repositório no GitHub agora? [s/N]: ").strip().lower()
+    if criar_repo == "s":
+        setup_github(app_name)
+    else:
+        print(f"\n  Próximos passos:")
+        print(f"  1. Copie .env.production.example → .env.production e preencha os secrets")
+        print(f"  2. git add . && git commit -m 'chore: setup project {app_name}'")
     print()
+
+
+def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, cwd=ROOT, check=check, capture_output=True, text=True)
+
+
+def setup_github(app_name: str) -> None:
+    # Verifica se gh está instalado
+    if not shutil.which("gh"):
+        print("\n  GitHub CLI (gh) não encontrado. Instale em: https://cli.github.com")
+        print(f"  Depois rode manualmente:")
+        print(f"    gh repo create {app_name} --private --source=. --remote=origin --push")
+        return
+
+    # Verifica se gh está autenticado
+    auth = run(["gh", "auth", "status"], check=False)
+    if auth.returncode != 0:
+        print("\n  Você não está autenticado no GitHub CLI. Rode: gh auth login")
+        return
+
+    visibilidade = input("  Repositório público ou privado? [privado/publico]: ").strip().lower()
+    flag = "--public" if visibilidade == "publico" else "--private"
+
+    print(f"\n  Recriando histórico git limpo...")
+    shutil.rmtree(ROOT / ".git")
+    run(["git", "init", "-b", "main"])
+    run(["git", "add", "."])
+    run(["git", "commit", "-m", f"chore: setup project {app_name} from django-ninja-boilerplate"])
+
+    print(f"  Criando repositório '{app_name}' no GitHub ({flag[2:]})...")
+    result = run(
+        ["gh", "repo", "create", app_name, flag, "--source=.", "--remote=origin", "--push"],
+        check=False,
+    )
+
+    if result.returncode == 0:
+        # Pega a URL do repo criado
+        url = run(["gh", "repo", "view", app_name, "--json", "url", "-q", ".url"], check=False)
+        repo_url = url.stdout.strip() if url.returncode == 0 else ""
+        print(f"\n  Repositório criado com sucesso!")
+        if repo_url:
+            print(f"  {repo_url}")
+        print(f"\n  Próximos passos:")
+        print(f"  1. Copie .env.production.example → .env.production e preencha os secrets")
+    else:
+        print(f"\n  Erro ao criar repositório:")
+        print(f"  {result.stderr.strip()}")
+        print(f"\n  O histórico git foi reiniciado. Crie o repo manualmente e rode:")
+        print(f"    git remote add origin <url> && git push -u origin main")
 
 
 if __name__ == "__main__":
