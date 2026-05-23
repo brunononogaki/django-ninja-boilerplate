@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 """
-rename.py — Personaliza o Django Ninja Boilerplate para um novo projeto.
+setup-my-saas.py — Personaliza o Django Ninja Boilerplate para um novo projeto.
 
-Uso interativo:
-    python rename.py
-
-Uso direto (dry-run):
-    python rename.py --app petshop --backend api.petshop.com.br --frontend app.petshop.com.br
-
-Aplicar mudanças:
-    python rename.py --app petshop --backend api.petshop.com.br --frontend app.petshop.com.br --apply
+Uso:
+    python3 setup-my-saas.py
 """
 
-import argparse
 import re
 import shutil
 import sys
@@ -141,73 +134,70 @@ def validate_app_name(name: str) -> str | None:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Renomeia o Django Ninja Boilerplate para um novo projeto."
-    )
-    parser.add_argument("--app", help="Nome do app Python (ex: petshop)")
-    parser.add_argument("--backend", help="Domínio do backend (ex: api.petshop.com.br)")
-    parser.add_argument("--frontend", help="Domínio do frontend (ex: app.petshop.com.br)")
-    parser.add_argument("--apply", action="store_true", help="Aplica as mudanças (padrão: dry-run)")
-    args = parser.parse_args()
-
-    print("\n  Django Ninja Boilerplate — Renomeador de Projeto")
+    print("\n  Setup My SaaS — Django Ninja Boilerplate")
     print("  " + "─" * 50)
 
-    # Coleta interativa se args faltarem
-    app_name = args.app
-    if not app_name:
-        app_name = ask("Nome do app (ex: petshop)")
-    err = validate_app_name(app_name)
-    if err:
-        print(f"\n  Erro no nome do app: {err}")
-        sys.exit(1)
+    # Coleta de dados
+    while True:
+        app_name = ask("Nome do app Python (ex: petshop)")
+        err = validate_app_name(app_name)
+        if err:
+            print(f"  Erro: {err}")
+        else:
+            break
 
-    backend_domain = args.backend or ask("Domínio do backend (ex: api.petshop.com.br)")
-    frontend_domain = args.frontend or ask("Domínio do frontend (ex: app.petshop.com.br)")
+    backend_domain = ask("Domínio do backend  (ex: api.petshop.com.br)")
+    frontend_domain = ask("Domínio do frontend (ex: app.petshop.com.br)")
 
     replacements = build_replacements(app_name, backend_domain, frontend_domain)
-    apply = args.apply
 
-    mode = "APLICANDO MUDANÇAS" if apply else "DRY-RUN — nada será alterado (use --apply para aplicar)"
-    print(f"\n  Modo: {mode}")
+    # Preview das mudanças
+    print(f"\n  Resumo do que será alterado:")
     print(f"  App:      {OLD_APP} → {app_name}")
     print(f"  Backend:  {OLD_BACKEND_DOMAIN} → {backend_domain}")
     print(f"  Frontend: {OLD_FRONTEND_DOMAIN} → {frontend_domain}")
     print(f"  Domínio:  .{OLD_ROOT_DOMAIN} → .{get_root_domain(backend_domain)}")
     print("  " + "─" * 50 + "\n")
 
-    # 1. Substituições em arquivos (antes de renomear pasta)
     total_files = 0
     for path in iter_text_files(ROOT):
-        diffs = replace_in_file(path, replacements, apply)
+        diffs = replace_in_file(path, replacements, apply=False)
         if diffs:
             total_files += 1
-            print(f"[arquivo] {path.relative_to(ROOT)}")
-            for d in diffs[:8]:
+            print(f"  [arquivo] {path.relative_to(ROOT)}")
+            for d in diffs[:6]:
                 print(d)
-            if len(diffs) > 8:
-                print(f"  ... +{len(diffs) - 8} linha(s)")
+            if len(diffs) > 6:
+                print(f"  ... +{len(diffs) - 6} linha(s)")
             print()
 
-    # 2. Rename da pasta myapi/ (por último)
-    print("[pasta]")
-    folder_msg = rename_app_folder(app_name, apply)
+    folder_msg = rename_app_folder(app_name, apply=False)
     if folder_msg:
-        print(folder_msg)
-    else:
-        print(f"  Pasta '{OLD_APP}/' não encontrada, nada a renomear.")
+        print(f"  [pasta] {folder_msg.strip()}")
 
-    # Resumo
+    # Confirmação
+    print(f"\n  " + "─" * 50)
+    print(f"  {total_files} arquivo(s) serão modificados.")
+    confirmacao = input("\n  Confirmar e aplicar as mudanças? [s/N]: ").strip().lower()
+    if confirmacao != "s":
+        print("\n  Cancelado. Nenhuma alteração foi feita.\n")
+        sys.exit(0)
+
+    # Aplica
+    print()
+    for path in iter_text_files(ROOT):
+        diffs = replace_in_file(path, replacements, apply=True)
+        if diffs:
+            print(f"  ✓ {path.relative_to(ROOT)}")
+
+    rename_app_folder(app_name, apply=True)
+    print(f"  ✓ pasta {OLD_APP}/ → {app_name}/")
+
     print("\n  " + "─" * 50)
-    if apply:
-        print(f"  Concluído. {total_files} arquivo(s) modificado(s).")
-        print(f"  Pasta: {OLD_APP}/ → {app_name}/")
-        print("\n  Próximos passos:")
-        print("  1. Copie .env.production.example → .env.production e preencha os secrets")
-        print("  2. git add . && git commit -m 'chore: rename project to {app_name}'")
-    else:
-        print(f"  {total_files} arquivo(s) seriam modificados.")
-        print(f"  Rode com --apply para aplicar as mudanças.")
+    print(f"  Concluído! {total_files} arquivo(s) modificado(s).")
+    print(f"\n  Próximos passos:")
+    print(f"  1. Copie .env.production.example → .env.production e preencha os secrets")
+    print(f"  2. git add . && git commit -m 'chore: setup project {app_name}'")
     print()
 
 
