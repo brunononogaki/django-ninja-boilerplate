@@ -213,6 +213,29 @@ def main():
         shutil.rmtree(docs_path)
         print(f"  ✓ pasta docs/ removida")
 
+    deploy_yaml = ROOT / ".github" / "workflows" / "deploy.yaml"
+    if deploy_yaml.exists():
+        content = deploy_yaml.read_text(encoding="utf-8")
+        docs_step = (
+            "\n\n      - name: Build Documentation\n"
+            "        uses: appleboy/ssh-action@v1.0.0\n"
+            "        with:\n"
+            "          host: ${{ secrets.DEPLOY_HOST }}\n"
+            "          username: ${{ secrets.DEPLOY_USER }}\n"
+            "          key: ${{ secrets.DEPLOY_SSH_KEY }}\n"
+            "          port: ${{ secrets.DEPLOY_PORT || 22 }}\n"
+            "          script: |\n"
+            "            set -e\n"
+            "            cd ${{ secrets.DEPLOY_PATH }}/docs\n"
+            "            echo \"🚀 Subindo container do mkdocs...\"\n"
+            "            docker compose down && docker compose up -d --build\n"
+            "            echo \"✅ Deploy do mkdocs concluído!\""
+        )
+        new_content = content.replace(docs_step, "")
+        if new_content != content:
+            deploy_yaml.write_text(new_content, encoding="utf-8")
+            print(f"  ✓ step 'Build Documentation' removido do deploy.yaml")
+
     print("\n  " + "─" * 50)
     print(f"  Concluído! {total_files} arquivo(s) modificado(s).")
 
