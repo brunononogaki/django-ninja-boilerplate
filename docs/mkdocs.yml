@@ -38,6 +38,7 @@ nav:
       - 02. Rate Limiting: Appendix/02_Rate_Limiting.md
       - 03. Headers de Segurança: Appendix/03_Headers_de_Seguranca.md
       - 04. Transferindo o Domínio para a Cloudflare: Appendix/04_Transferencia_Dominio_Cloudflare.md
+      - 05. Hardening do Servidor: Appendix/05_Hardening_do_servidor.md
 theme:
   name: material
   palette:
