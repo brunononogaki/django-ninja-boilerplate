@@ -247,6 +247,12 @@ def setup_github(app_name: str) -> None:
         print(f"\n  Repositório criado com sucesso!")
         if repo_url:
             print(f"  {repo_url}")
+
+        print(f"  Criando branch development...")
+        run(["git", "checkout", "-b", "development"])
+        run(["git", "push", "-u", "origin", "development"])
+        print(f"  ✓ branch development criada e pushed")
+
         setup_secrets(app_name)
     else:
         print(f"\n  Erro ao criar repositório:")
