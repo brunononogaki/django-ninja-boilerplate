@@ -101,6 +101,9 @@ def clear_auth_cookies(response):
 class JWTAuth(APIKeyCookie):
     param_name = 'access_token'
 
+    def __init__(self):
+        super().__init__(csrf=False)
+
     def authenticate(self, request, key):  # noqa: PLR6301
         try:
             payload = jwt.decode(key, settings.SECRET_KEY, algorithms=[ALGO])
