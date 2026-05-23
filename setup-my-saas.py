@@ -138,6 +138,20 @@ def main():
     print("\n  Setup My SaaS — Django Ninja Boilerplate")
     print("  " + "─" * 50)
 
+    # Verifica autenticação GitHub CLI
+    if not shutil.which("gh"):
+        print("\n  GitHub CLI (gh) não encontrado. Instale em: https://cli.github.com")
+        print("  O script continuará, mas a criação do repositório não estará disponível.\n")
+    else:
+        auth = subprocess.run(["gh", "auth", "status"], capture_output=True)
+        if auth.returncode != 0:
+            print("\n  Você não está logado no GitHub CLI.")
+            fazer_login = input("  Fazer login agora? [s/N]: ").strip().lower()
+            if fazer_login == "s":
+                subprocess.run(["gh", "auth", "login"])
+            else:
+                print("  Continuando sem autenticação — criação do repositório não estará disponível.\n")
+
     # Coleta de dados
     while True:
         app_name = ask("Nome do app Python (ex: petshop)")
@@ -194,6 +208,11 @@ def main():
     rename_app_folder(app_name, apply=True)
     print(f"  ✓ pasta {OLD_APP}/ → {app_name}/")
 
+    docs_path = ROOT / "docs"
+    if docs_path.exists():
+        shutil.rmtree(docs_path)
+        print(f"  ✓ pasta docs/ removida")
+
     print("\n  " + "─" * 50)
     print(f"  Concluído! {total_files} arquivo(s) modificado(s).")
 
@@ -213,17 +232,8 @@ def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
 
 
 def setup_github(app_name: str) -> None:
-    # Verifica se gh está instalado
     if not shutil.which("gh"):
-        print("\n  GitHub CLI (gh) não encontrado. Instale em: https://cli.github.com")
-        print(f"  Depois rode manualmente:")
-        print(f"    gh repo create {app_name} --private --source=. --remote=origin --push")
-        return
-
-    # Verifica se gh está autenticado
-    auth = run(["gh", "auth", "status"], check=False)
-    if auth.returncode != 0:
-        print("\n  Você não está autenticado no GitHub CLI. Rode: gh auth login")
+        print("\n  gh não encontrado — pulando criação do repositório.")
         return
 
     visibilidade = input("  Repositório público ou privado? [privado/publico]: ").strip().lower()
