@@ -242,19 +242,86 @@ def setup_github(app_name: str) -> None:
     )
 
     if result.returncode == 0:
-        # Pega a URL do repo criado
         url = run(["gh", "repo", "view", app_name, "--json", "url", "-q", ".url"], check=False)
         repo_url = url.stdout.strip() if url.returncode == 0 else ""
         print(f"\n  Repositório criado com sucesso!")
         if repo_url:
             print(f"  {repo_url}")
-        print(f"\n  Próximos passos:")
-        print(f"  1. Copie .env.production.example → .env.production e preencha os secrets")
+        setup_secrets(app_name)
     else:
         print(f"\n  Erro ao criar repositório:")
         print(f"  {result.stderr.strip()}")
         print(f"\n  O histórico git foi reiniciado. Crie o repo manualmente e rode:")
         print(f"    git remote add origin <url> && git push -u origin main")
+
+
+def setup_secrets(app_name: str) -> None:
+    print("\n  " + "─" * 50)
+    configurar = input("  Configurar secrets de deploy no GitHub Actions? [s/N]: ").strip().lower()
+    if configurar != "s":
+        print(f"\n  Próximos passos:")
+        print(f"  1. Copie .env.production.example → .env.production e preencha os secrets")
+        print(f"  2. Configure as secrets de deploy: gh secret set DEPLOY_HOST etc.")
+        return
+
+    print("\n  Informe os dados de acesso à VPS:")
+    host = ask("IP ou hostname da VPS (DEPLOY_HOST)")
+    user = input("  Usuário SSH (DEPLOY_USER) [root]: ").strip() or "root"
+    path = ask("Caminho no servidor (DEPLOY_PATH, ex: /opt/petshop)")
+    port = input("  Porta SSH (DEPLOY_PORT) [22]: ").strip() or "22"
+
+    print("\n  Chave SSH privada:")
+    print("  (usada pelo GitHub Actions para acessar a VPS)")
+    while True:
+        key_path = input("  Caminho local da chave privada [~/.ssh/id_rsa]: ").strip() or "~/.ssh/id_rsa"
+        key_file = Path(key_path).expanduser()
+        if key_file.exists():
+            break
+        print(f"  Arquivo não encontrado: {key_file}")
+
+    print()
+    secrets = {
+        "DEPLOY_HOST": host,
+        "DEPLOY_USER": user,
+        "DEPLOY_PATH": path,
+        "DEPLOY_PORT": port,
+    }
+
+    ok = True
+    for name, value in secrets.items():
+        result = run(["gh", "secret", "set", name, "--repo", app_name, "--body", value], check=False)
+        if result.returncode == 0:
+            print(f"  ✓ {name}")
+        else:
+            print(f"  ✗ {name}: {result.stderr.strip()}")
+            ok = False
+
+    # SSH key via stdin para não expor no histórico do shell
+    key_content = key_file.read_text()
+    result = subprocess.run(
+        ["gh", "secret", "set", "DEPLOY_SSH_KEY", "--repo", app_name],
+        input=key_content,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        print(f"  ✓ DEPLOY_SSH_KEY")
+    else:
+        print(f"  ✗ DEPLOY_SSH_KEY: {result.stderr.strip()}")
+        ok = False
+
+    print()
+    if ok:
+        print(f"  Secrets configuradas! O deploy para a VPS está pronto.")
+        print(f"\n  Próximo passo:")
+        print(f"  1. Copie .env.production.example → .env.production e preencha os secrets")
+        print(f"  2. Faça o primeiro deploy manual no servidor:")
+        print(f"     scp .env.production {user}@{host}:{path}/.env.production")
+        print(f"     ssh {user}@{host} 'cd {path} && ./deploy.sh'")
+    else:
+        print(f"  Algumas secrets falharam. Verifique e reconfigure manualmente com:")
+        print(f"  gh secret set <NOME> --repo {app_name}")
 
 
 if __name__ == "__main__":
