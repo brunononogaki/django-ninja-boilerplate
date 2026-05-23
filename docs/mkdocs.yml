@@ -33,6 +33,7 @@ nav:
       - 01. Configurando o Traefik: Appendix/01_Configurando_o_Traefik.md
       - 02. Rate Limiting: Appendix/02_Rate_Limiting.md
       - 03. Headers de Segurança: Appendix/03_Headers_de_Seguranca.md
+      - 04. Transferindo o Domínio para a Cloudflare: Appendix/04_Transferencia_Dominio_Cloudflare.md
 theme:
   name: material
   palette:

@@ -33,6 +33,7 @@ No arquivo `./infra/compose-pro.yaml`, vamos adicionar um middleware de rate lim
       - "traefik.http.routers.myapi.rule=Host(`${BACKEND_FQDN}`)"
       - "traefik.http.routers.myapi.entrypoints=websecure"
       - "traefik.http.routers.myapi.tls=true"
+      - "traefik.http.routers.myapi.tls.certresolver=letsencrypt"
       - "traefik.http.routers.myapi.middlewares=myapi-ratelimit"
       - "traefik.http.middlewares.myapi-ratelimit.rateLimit.average=100"
       - "traefik.http.middlewares.myapi-ratelimit.rateLimit.burst=50"

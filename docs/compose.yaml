@@ -7,6 +7,7 @@ services:
       - "traefik.http.routers.djangoninja-docs.rule=Host(`djangoninja.brunononogaki.com`)"
       - "traefik.http.routers.djangoninja-docs.entrypoints=websecure"
       - "traefik.http.routers.djangoninja-docs.tls=true"
+      - "traefik.http.routers.djangoninja-docs.tls.certresolver=letsencrypt"
       - "traefik.http.services.djangoninja-docs.loadbalancer.server.port=8001"
       - "traefik.docker.network=my-network"
     volumes:
