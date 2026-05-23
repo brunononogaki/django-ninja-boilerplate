@@ -23,6 +23,7 @@ services:
       - "traefik.http.routers.frontend.rule=Host(`${FRONTEND_FQDN}`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
       - "traefik.docker.network=my-network"
     logging:

@@ -164,6 +164,7 @@ services:
       - "traefik.http.routers.myapi.rule=Host(`${BACKEND_URL}`)"
       - "traefik.http.routers.myapi.entrypoints=websecure"
       - "traefik.http.routers.myapi.tls=true"
+      - "traefik.http.routers.myapi.tls.certresolver=letsencrypt"
       - "traefik.http.services.myapi.loadbalancer.server.port=8000"
       - "traefik.docker.network=my-network"
     networks:
