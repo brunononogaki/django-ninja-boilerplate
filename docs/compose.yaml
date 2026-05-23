@@ -1,5 +1,6 @@
 services:
   mkdocs:
+    container_name: boilerplate_docs
     image: python:3.11
     labels:
       # Traefik configuration
