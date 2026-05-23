@@ -137,7 +137,7 @@ version: "3.9"
 
 services:
   database:
-    container_name: postgres-prod
+    container_name: boilerplate_database
     image: postgres:17.0
     env_file:
       - ../.env.production
@@ -153,7 +153,7 @@ services:
         max-file: "3"
 
   web:
-    container_name: django-ninja-prod
+    container_name: boilerplate_back
     build:
       context: ..
       dockerfile: infra/Dockerfile-pro
@@ -348,8 +348,8 @@ Agora, quando você fizer um push para a branch main, os containers do WebServer
 
 ```bash
 CONTAINER ID   IMAGE                    COMMAND                  CREATED         STATUS                 PORTS                                                                                          NAMES
-60055a3d99e3   infra-web                "uvicorn myapi.asgi:…"   50 minutes ago   Up 50 minutes         8000/tcp                                                                                       django-ninja-prod
-056561459f60   postgres:17.0            "docker-entrypoint.s…"   6 seconds ago   Up 6 seconds           5432/tcp                                                                                       postgres-prod
+60055a3d99e3   infra-web                "uvicorn myapi.asgi:…"   50 minutes ago   Up 50 minutes         8000/tcp                                                                                       boilerplate_back
+056561459f60   postgres:17.0            "docker-entrypoint.s…"   6 seconds ago   Up 6 seconds           5432/tcp                                                                                       boilerplate_database
 ```
 
 !!! tip
