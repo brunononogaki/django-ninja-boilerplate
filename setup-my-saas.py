@@ -263,7 +263,8 @@ def setup_github(app_name: str) -> None:
         run(["git", "push", "-u", "origin", "development"])
         print(f"  ✓ branch development criada e pushed")
 
-        setup_secrets(app_name)
+        gh_user = run(["gh", "api", "user", "--jq", ".login"], check=False).stdout.strip()
+        setup_secrets(app_name, gh_user)
     else:
         print(f"\n  Erro ao criar repositório:")
         print(f"  {result.stderr.strip()}")
@@ -271,7 +272,8 @@ def setup_github(app_name: str) -> None:
         print(f"    git remote add origin <url> && git push -u origin main")
 
 
-def setup_secrets(app_name: str) -> None:
+def setup_secrets(app_name: str, gh_user: str = "") -> None:
+    repo_ref = f"{gh_user}/{app_name}" if gh_user else app_name
     print("\n  " + "─" * 50)
     configurar = input("  Configurar secrets de deploy no GitHub Actions? [s/N]: ").strip().lower()
     if configurar != "s":
@@ -305,7 +307,7 @@ def setup_secrets(app_name: str) -> None:
 
     ok = True
     for name, value in secrets.items():
-        result = run(["gh", "secret", "set", name, "--repo", app_name, "--body", value], check=False)
+        result = run(["gh", "secret", "set", name, "--repo", repo_ref, "--body", value], check=False)
         if result.returncode == 0:
             print(f"  ✓ {name}")
         else:
@@ -315,7 +317,7 @@ def setup_secrets(app_name: str) -> None:
     # SSH key via stdin para não expor no histórico do shell
     key_content = key_file.read_text()
     result = subprocess.run(
-        ["gh", "secret", "set", "DEPLOY_SSH_KEY", "--repo", app_name],
+        ["gh", "secret", "set", "DEPLOY_SSH_KEY", "--repo", repo_ref],
         input=key_content,
         cwd=ROOT,
         capture_output=True,
