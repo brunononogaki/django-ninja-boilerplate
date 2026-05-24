@@ -284,6 +284,14 @@ def setup_secrets(app_name: str, gh_user: str = "") -> dict | None:
     return {"host": host, "user": user, "path": path, "port": port, "key_file": key_file}
 
 
+def set_env_var(content: str, key: str, value: str) -> str:
+    lines = []
+    for line in content.splitlines():
+        stripped = line.replace(" ", "")
+        lines.append(f"{key}={value}" if stripped.startswith(f"{key}=") else line)
+    return "\n".join(lines)
+
+
 def setup_env_production(app_name: str, vps: dict) -> None:
     print("\n  " + "─" * 50)
     print("  Configurar .env.production:")
@@ -301,19 +309,19 @@ def setup_env_production(app_name: str, vps: dict) -> None:
     example = ROOT / ".env.production.example"
     content = example.read_text(encoding="utf-8") if example.exists() else ""
 
-    replacements = [
-        ("POSTGRES_USER=devuser", f"POSTGRES_USER={pg_user}"),
-        ("POSTGRES_PASSWORD=devpassword", f"POSTGRES_PASSWORD={pg_password}"),
-        ("POSTGRES_DB=postgres", f"POSTGRES_DB={pg_db}"),
-        ("SECRET_KEY='mysecretkey-pro'", f"SECRET_KEY='{secret_key}'"),
-        ("DJANGO_ADMIN_USER = 'admin'", f"DJANGO_ADMIN_USER = '{admin_user}'"),
-        ("DJANGO_ADMIN_EMAIL = 'admin@admin.com'", f"DJANGO_ADMIN_EMAIL = '{admin_email}'"),
-        ("DJANGO_ADMIN_PASSWORD = 'devpassword'", f"DJANGO_ADMIN_PASSWORD = '{admin_password}'"),
-        ("GMAIL_EMAIL=email@gmail.com", f"GMAIL_EMAIL={gmail_email}" if gmail_email else "GMAIL_EMAIL="),
-        ("GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx", f"GMAIL_APP_PASSWORD={gmail_password}" if gmail_password else "GMAIL_APP_PASSWORD="),
-    ]
-    for old, new in replacements:
-        content = content.replace(old, new)
+    overrides = {
+        "POSTGRES_USER": pg_user,
+        "POSTGRES_PASSWORD": pg_password,
+        "POSTGRES_DB": pg_db,
+        "SECRET_KEY": f"'{secret_key}'",
+        "DJANGO_ADMIN_USER": f"'{admin_user}'",
+        "DJANGO_ADMIN_EMAIL": f"'{admin_email}'",
+        "DJANGO_ADMIN_PASSWORD": f"'{admin_password}'",
+        "GMAIL_EMAIL": gmail_email,
+        "GMAIL_APP_PASSWORD": gmail_password,
+    }
+    for key, value in overrides.items():
+        content = set_env_var(content, key, value)
 
     env_file = ROOT / ".env.production"
     env_file.write_text(content, encoding="utf-8")
