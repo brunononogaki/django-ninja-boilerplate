@@ -26,6 +26,7 @@ BINARY_EXTENSIONS = {
     ".woff", ".woff2", ".ttf", ".eot", ".pdf", ".zip", ".tar", ".gz",
     ".db", ".sqlite3",
 }
+PREVIEW_LINES = 6
 
 # Valores atuais do boilerplate — o que será substituído
 OLD_APP = "myapi"
@@ -37,29 +38,51 @@ OLD_FRONTEND_DOMAIN = "react.brunononogaki.com"
 OLD_ROOT_DOMAIN = "brunononogaki.com"
 
 
+# ─── helpers ──────────────────────────────────────────────────────────────────
+
+def ask(prompt: str) -> str:
+    while True:
+        value = input(f"  {prompt}: ").strip()
+        if value:
+            return value
+        print("  Campo obrigatório.")
+
+
+def ask_optional(prompt: str) -> str:
+    return input(f"  {prompt} (opcional, Enter para pular): ").strip()
+
+
+def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, cwd=ROOT, check=check, capture_output=True, text=True)
+
+
+def ssh_run(host: str, user: str, port: str, key_file: Path, command: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["ssh", "-i", str(key_file), "-p", port, "-o", "StrictHostKeyChecking=no",
+         f"{user}@{host}", command],
+        capture_output=True, text=True,
+    )
+
+
 def get_root_domain(domain: str) -> str:
-    """api.myapp.com.br → myapp.com.br | myapp.com → myapp.com"""
     parts = domain.split(".")
     return ".".join(parts[1:]) if len(parts) > 2 else domain
 
 
+# ─── renomeação ───────────────────────────────────────────────────────────────
+
 def build_replacements(app_name: str, backend_domain: str, frontend_domain: str) -> list[tuple[str, str]]:
     new_root = get_root_domain(backend_domain)
     return [
-        # Domínios completos primeiro (mais específicos → menos específicos)
         (f"https://{OLD_BACKEND_DOMAIN}", f"https://{backend_domain}"),
         (f"https://{OLD_FRONTEND_DOMAIN}", f"https://{frontend_domain}"),
         (OLD_BACKEND_DOMAIN, backend_domain),
         (OLD_FRONTEND_DOMAIN, frontend_domain),
         (f".{OLD_ROOT_DOMAIN}", f".{new_root}"),
         (OLD_ROOT_DOMAIN, new_root),
-        # Nomes de projeto / repo
         (OLD_REPO_NAME, app_name),
-        # Container prefix (boilerplate_ → app_)
         (f"{OLD_CONTAINER_PREFIX}_", f"{app_name}_"),
-        # Docker project name — padrão específico para não substituir a lib django-ninja
         (f"--project-name {OLD_PROJECT_NAME}", f"--project-name {app_name}"),
-        # Módulo Python (myapi → app_name) — por último para não colidir com domínios
         (OLD_APP, app_name),
     ]
 
@@ -93,9 +116,7 @@ def replace_in_file(path: Path, replacements: list[tuple[str, str]], apply: bool
         return []
 
     diffs = []
-    for i, (old_line, new_line) in enumerate(
-        zip(content.splitlines(), new_content.splitlines()), 1
-    ):
+    for i, (old_line, new_line) in enumerate(zip(content.splitlines(), new_content.splitlines()), 1):
         if old_line != new_line:
             diffs.append(f"  L{i}: {old_line.strip()!r}\n       → {new_line.strip()!r}")
 
@@ -111,19 +132,10 @@ def rename_app_folder(app_name: str, apply: bool) -> str | None:
     if not old_path.exists():
         return None
     if new_path.exists():
-        return f"  AVISO: pasta '{app_name}/' já existe, pulando rename."
-    msg = f"  {OLD_APP}/ → {app_name}/"
+        return f"AVISO: pasta '{app_name}/' já existe, pulando rename."
     if apply:
         shutil.move(str(old_path), str(new_path))
-    return msg
-
-
-def ask(prompt: str) -> str:
-    while True:
-        value = input(f"  {prompt}: ").strip()
-        if value:
-            return value
-        print("  Campo obrigatório.")
+    return f"{OLD_APP}/ → {app_name}/"
 
 
 def validate_app_name(name: str) -> str | None:
@@ -134,25 +146,210 @@ def validate_app_name(name: str) -> str | None:
     return None
 
 
+def remove_docs_deploy_step() -> None:
+    deploy_yaml = ROOT / ".github" / "workflows" / "deploy.yaml"
+    if not deploy_yaml.exists():
+        return
+    content = deploy_yaml.read_text(encoding="utf-8")
+    docs_step = (
+        "\n\n      - name: Build Documentation\n"
+        "        uses: appleboy/ssh-action@v1.0.0\n"
+        "        with:\n"
+        "          host: ${{ secrets.DEPLOY_HOST }}\n"
+        "          username: ${{ secrets.DEPLOY_USER }}\n"
+        "          key: ${{ secrets.DEPLOY_SSH_KEY }}\n"
+        "          port: ${{ secrets.DEPLOY_PORT || 22 }}\n"
+        "          script: |\n"
+        "            set -e\n"
+        "            cd ${{ secrets.DEPLOY_PATH }}/docs\n"
+        "            echo \"🚀 Subindo container do mkdocs...\"\n"
+        "            docker compose down && docker compose up -d --build\n"
+        "            echo \"✅ Deploy do mkdocs concluído!\""
+    )
+    new_content = content.replace(docs_step, "")
+    if new_content != content:
+        deploy_yaml.write_text(new_content, encoding="utf-8")
+        print("  ✓ step 'Build Documentation' removido do deploy.yaml")
+
+
+# ─── GitHub ───────────────────────────────────────────────────────────────────
+
+def check_gh_auth() -> None:
+    if not shutil.which("gh"):
+        print("\n  GitHub CLI (gh) não encontrado. Instale em: https://cli.github.com")
+        print("  O script continuará, mas a criação do repositório não estará disponível.\n")
+        return
+    auth = subprocess.run(["gh", "auth", "status"], capture_output=True, check=False)
+    if auth.returncode != 0:
+        print("\n  Você não está logado no GitHub CLI.")
+        if input("  Fazer login agora? [s/N]: ").strip().lower() == "s":
+            subprocess.run(["gh", "auth", "login"], check=False)
+        else:
+            print("  Continuando sem autenticação — criação do repositório não estará disponível.\n")
+
+
+def setup_github(app_name: str) -> None:
+    if not shutil.which("gh"):
+        print("\n  gh não encontrado — pulando criação do repositório.")
+        return
+
+    visibilidade = input("  Repositório público ou privado? [privado/publico]: ").strip().lower()
+    flag = "--public" if visibilidade == "publico" else "--private"
+
+    print("\n  Recriando histórico git limpo...")
+    shutil.rmtree(ROOT / ".git")
+    run(["git", "init", "-b", "main"])
+    run(["git", "add", "."])
+    run(["git", "commit", "-m", f"chore: setup project {app_name} from django-ninja-boilerplate"])
+
+    print(f"  Criando repositório '{app_name}' no GitHub ({flag[2:]})...")
+    result = run(["gh", "repo", "create", app_name, flag, "--source=.", "--remote=origin"], check=False)
+
+    if result.returncode != 0:
+        print(f"\n  Erro ao criar repositório:\n  {result.stderr.strip()}")
+        print("\n  O histórico git foi reiniciado. Crie o repo manualmente e rode:")
+        print("    git remote add origin <url> && git push -u origin main")
+        return
+
+    url = run(["gh", "repo", "view", app_name, "--json", "url", "-q", ".url"], check=False)
+    repo_url = url.stdout.strip() if url.returncode == 0 else ""
+    if repo_url:
+        print(f"  Repositório criado: {repo_url}")
+
+    gh_user = run(["gh", "api", "user", "--jq", ".login"], check=False).stdout.strip()
+
+    # Secrets e .env ANTES do push
+    vps_info = setup_secrets(app_name, gh_user)
+    if vps_info:
+        setup_env_production(app_name, vps_info)
+
+    # Push para main só depois que tudo estiver pronto
+    print("\n  Fazendo push para main...")
+    run(["git", "push", "-u", "origin", "main"])
+    print("  ✓ main pushed")
+
+    print("  Criando branch development...")
+    run(["git", "checkout", "-b", "development"])
+    run(["git", "push", "-u", "origin", "development"])
+    print("  ✓ branch development criada e pushed")
+
+    if repo_url:
+        print(f"\n  Tudo pronto! {repo_url}")
+
+
+def setup_secrets(app_name: str, gh_user: str = "") -> dict | None:
+    repo_ref = f"{gh_user}/{app_name}" if gh_user else app_name
+    print("\n  " + "─" * 50)
+    if input("  Configurar secrets de deploy no GitHub Actions? [s/N]: ").strip().lower() != "s":
+        return None
+
+    print("\n  Informe os dados de acesso à VPS:")
+    host = ask("IP ou hostname da VPS (DEPLOY_HOST)")
+    user = input("  Usuário SSH (DEPLOY_USER) [root]: ").strip() or "root"
+    path = ask("Caminho no servidor (DEPLOY_PATH, ex: /opt/petshop)")
+    port = input("  Porta SSH (DEPLOY_PORT) [22]: ").strip() or "22"
+
+    print("\n  Chave SSH privada (usada pelo GitHub Actions para acessar a VPS):")
+    while True:
+        key_path = input("  Caminho local da chave privada [~/.ssh/id_rsa]: ").strip() or "~/.ssh/id_rsa"
+        key_file = Path(key_path).expanduser()
+        if key_file.exists():
+            break
+        print(f"  Arquivo não encontrado: {key_file}")
+
+    print()
+    ok = True
+    for name, value in {"DEPLOY_HOST": host, "DEPLOY_USER": user, "DEPLOY_PATH": path, "DEPLOY_PORT": port}.items():
+        res = run(["gh", "secret", "set", name, "--repo", repo_ref, "--body", value], check=False)
+        if res.returncode == 0:
+            print(f"  ✓ {name}")
+        else:
+            print(f"  ✗ {name}: {res.stderr.strip()}")
+            ok = False
+
+    res = subprocess.run(
+        ["gh", "secret", "set", "DEPLOY_SSH_KEY", "--repo", repo_ref],
+        input=key_file.read_text(),
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    if res.returncode == 0:
+        print("  ✓ DEPLOY_SSH_KEY")
+    else:
+        print(f"  ✗ DEPLOY_SSH_KEY: {res.stderr.strip()}")
+        ok = False
+
+    if not ok:
+        print(f"\n  Algumas secrets falharam. Reconfigure com: gh secret set <NOME> --repo {repo_ref}")
+
+    return {"host": host, "user": user, "path": path, "port": port, "key_file": key_file}
+
+
+def setup_env_production(app_name: str, vps: dict) -> None:
+    print("\n  " + "─" * 50)
+    print("  Configurar .env.production:")
+
+    pg_user = input("  POSTGRES_USER [postgres]: ").strip() or "postgres"
+    pg_password = ask("POSTGRES_PASSWORD")
+    pg_db = input(f"  POSTGRES_DB [{app_name}]: ").strip() or app_name
+    secret_key = ask("SECRET_KEY (Django — use uma string longa e aleatória)")
+    admin_user = input("  DJANGO_ADMIN_USER [admin]: ").strip() or "admin"
+    admin_email = ask("DJANGO_ADMIN_EMAIL")
+    admin_password = ask("DJANGO_ADMIN_PASSWORD")
+    gmail_email = ask_optional("GMAIL_EMAIL")
+    gmail_password = ask_optional("GMAIL_APP_PASSWORD")
+
+    example = ROOT / ".env.production.example"
+    content = example.read_text(encoding="utf-8") if example.exists() else ""
+
+    replacements = [
+        ("POSTGRES_USER=devuser", f"POSTGRES_USER={pg_user}"),
+        ("POSTGRES_PASSWORD=devpassword", f"POSTGRES_PASSWORD={pg_password}"),
+        ("POSTGRES_DB=postgres", f"POSTGRES_DB={pg_db}"),
+        ("SECRET_KEY='mysecretkey-pro'", f"SECRET_KEY='{secret_key}'"),
+        ("DJANGO_ADMIN_USER = 'admin'", f"DJANGO_ADMIN_USER = '{admin_user}'"),
+        ("DJANGO_ADMIN_EMAIL = 'admin@admin.com'", f"DJANGO_ADMIN_EMAIL = '{admin_email}'"),
+        ("DJANGO_ADMIN_PASSWORD = 'devpassword'", f"DJANGO_ADMIN_PASSWORD = '{admin_password}'"),
+        ("GMAIL_EMAIL=email@gmail.com", f"GMAIL_EMAIL={gmail_email}" if gmail_email else "GMAIL_EMAIL="),
+        ("GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx", f"GMAIL_APP_PASSWORD={gmail_password}" if gmail_password else "GMAIL_APP_PASSWORD="),
+    ]
+    for old, new in replacements:
+        content = content.replace(old, new)
+
+    env_file = ROOT / ".env.production"
+    env_file.write_text(content, encoding="utf-8")
+    print("  ✓ .env.production criado")
+
+    # Cria a pasta na VPS se não existir
+    print(f"\n  Criando pasta {vps['path']} na VPS...")
+    res = ssh_run(vps["host"], vps["user"], vps["port"], vps["key_file"], f"mkdir -p {vps['path']}")
+    if res.returncode == 0:
+        print(f"  ✓ pasta {vps['path']} pronta")
+    else:
+        print(f"  ✗ erro ao criar pasta: {res.stderr.strip()}")
+        return
+
+    # Envia o .env.production para a VPS
+    print("  Enviando .env.production para a VPS...")
+    res = subprocess.run(
+        ["scp", "-i", str(vps["key_file"]), "-P", vps["port"],
+         "-o", "StrictHostKeyChecking=no",
+         str(env_file), f"{vps['user']}@{vps['host']}:{vps['path']}/.env.production"],
+        capture_output=True, text=True,
+    )
+    if res.returncode == 0:
+        print("  ✓ .env.production enviado para a VPS")
+    else:
+        print(f"  ✗ erro no scp: {res.stderr.strip()}")
+
+
+# ─── main ─────────────────────────────────────────────────────────────────────
+
 def main():
     print("\n  Setup My SaaS — Django Ninja Boilerplate")
     print("  " + "─" * 50)
 
-    # Verifica autenticação GitHub CLI
-    if not shutil.which("gh"):
-        print("\n  GitHub CLI (gh) não encontrado. Instale em: https://cli.github.com")
-        print("  O script continuará, mas a criação do repositório não estará disponível.\n")
-    else:
-        auth = subprocess.run(["gh", "auth", "status"], capture_output=True)
-        if auth.returncode != 0:
-            print("\n  Você não está logado no GitHub CLI.")
-            fazer_login = input("  Fazer login agora? [s/N]: ").strip().lower()
-            if fazer_login == "s":
-                subprocess.run(["gh", "auth", "login"])
-            else:
-                print("  Continuando sem autenticação — criação do repositório não estará disponível.\n")
+    check_gh_auth()
 
-    # Coleta de dados
     while True:
         app_name = ask("Nome do app Python (ex: petshop)")
         err = validate_app_name(app_name)
@@ -166,7 +363,6 @@ def main():
 
     replacements = build_replacements(app_name, backend_domain, frontend_domain)
 
-    # Preview das mudanças
     print(f"\n  Resumo do que será alterado:")
     print(f"  App:      {OLD_APP} → {app_name}")
     print(f"  Backend:  {OLD_BACKEND_DOMAIN} → {backend_domain}")
@@ -180,189 +376,48 @@ def main():
         if diffs:
             total_files += 1
             print(f"  [arquivo] {path.relative_to(ROOT)}")
-            for d in diffs[:6]:
+            for d in diffs[:PREVIEW_LINES]:
                 print(d)
-            if len(diffs) > 6:
-                print(f"  ... +{len(diffs) - 6} linha(s)")
+            if len(diffs) > PREVIEW_LINES:
+                print(f"  ... +{len(diffs) - PREVIEW_LINES} linha(s)")
             print()
 
     folder_msg = rename_app_folder(app_name, apply=False)
     if folder_msg:
-        print(f"  [pasta] {folder_msg.strip()}")
+        print(f"  [pasta] {folder_msg}")
 
-    # Confirmação
-    print(f"\n  " + "─" * 50)
+    print("\n  " + "─" * 50)
     print(f"  {total_files} arquivo(s) serão modificados.")
-    confirmacao = input("\n  Confirmar e aplicar as mudanças? [s/N]: ").strip().lower()
-    if confirmacao != "s":
+    if input("\n  Confirmar e aplicar as mudanças? [s/N]: ").strip().lower() != "s":
         print("\n  Cancelado. Nenhuma alteração foi feita.\n")
         sys.exit(0)
 
-    # Aplica
     print()
     for path in iter_text_files(ROOT):
-        diffs = replace_in_file(path, replacements, apply=True)
-        if diffs:
+        if replace_in_file(path, replacements, apply=True):
             print(f"  ✓ {path.relative_to(ROOT)}")
 
-    rename_app_folder(app_name, apply=True)
-    print(f"  ✓ pasta {OLD_APP}/ → {app_name}/")
+    folder_msg = rename_app_folder(app_name, apply=True)
+    if folder_msg:
+        print(f"  ✓ {folder_msg}")
 
     docs_path = ROOT / "docs"
     if docs_path.exists():
         shutil.rmtree(docs_path)
-        print(f"  ✓ pasta docs/ removida")
+        print("  ✓ pasta docs/ removida")
 
-    deploy_yaml = ROOT / ".github" / "workflows" / "deploy.yaml"
-    if deploy_yaml.exists():
-        content = deploy_yaml.read_text(encoding="utf-8")
-        docs_step = (
-            "\n\n      - name: Build Documentation\n"
-            "        uses: appleboy/ssh-action@v1.0.0\n"
-            "        with:\n"
-            "          host: ${{ secrets.DEPLOY_HOST }}\n"
-            "          username: ${{ secrets.DEPLOY_USER }}\n"
-            "          key: ${{ secrets.DEPLOY_SSH_KEY }}\n"
-            "          port: ${{ secrets.DEPLOY_PORT || 22 }}\n"
-            "          script: |\n"
-            "            set -e\n"
-            "            cd ${{ secrets.DEPLOY_PATH }}/docs\n"
-            "            echo \"🚀 Subindo container do mkdocs...\"\n"
-            "            docker compose down && docker compose up -d --build\n"
-            "            echo \"✅ Deploy do mkdocs concluído!\""
-        )
-        new_content = content.replace(docs_step, "")
-        if new_content != content:
-            deploy_yaml.write_text(new_content, encoding="utf-8")
-            print(f"  ✓ step 'Build Documentation' removido do deploy.yaml")
+    remove_docs_deploy_step()
 
     print("\n  " + "─" * 50)
     print(f"  Concluído! {total_files} arquivo(s) modificado(s).")
 
-    # GitHub
-    criar_repo = input("\n  Criar repositório no GitHub agora? [s/N]: ").strip().lower()
-    if criar_repo == "s":
+    if input("\n  Criar repositório no GitHub agora? [s/N]: ").strip().lower() == "s":
         setup_github(app_name)
     else:
         print(f"\n  Próximos passos:")
         print(f"  1. Copie .env.production.example → .env.production e preencha os secrets")
         print(f"  2. git add . && git commit -m 'chore: setup project {app_name}'")
     print()
-
-
-def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=ROOT, check=check, capture_output=True, text=True)
-
-
-def setup_github(app_name: str) -> None:
-    if not shutil.which("gh"):
-        print("\n  gh não encontrado — pulando criação do repositório.")
-        return
-
-    visibilidade = input("  Repositório público ou privado? [privado/publico]: ").strip().lower()
-    flag = "--public" if visibilidade == "publico" else "--private"
-
-    print(f"\n  Recriando histórico git limpo...")
-    shutil.rmtree(ROOT / ".git")
-    run(["git", "init", "-b", "main"])
-    run(["git", "add", "."])
-    run(["git", "commit", "-m", f"chore: setup project {app_name} from django-ninja-boilerplate"])
-
-    print(f"  Criando repositório '{app_name}' no GitHub ({flag[2:]})...")
-    result = run(
-        ["gh", "repo", "create", app_name, flag, "--source=.", "--remote=origin", "--push"],
-        check=False,
-    )
-
-    if result.returncode == 0:
-        url = run(["gh", "repo", "view", app_name, "--json", "url", "-q", ".url"], check=False)
-        repo_url = url.stdout.strip() if url.returncode == 0 else ""
-        print(f"\n  Repositório criado com sucesso!")
-        if repo_url:
-            print(f"  {repo_url}")
-
-        print(f"  Criando branch development...")
-        run(["git", "checkout", "-b", "development"])
-        run(["git", "push", "-u", "origin", "development"])
-        print(f"  ✓ branch development criada e pushed")
-
-        gh_user = run(["gh", "api", "user", "--jq", ".login"], check=False).stdout.strip()
-        setup_secrets(app_name, gh_user)
-    else:
-        print(f"\n  Erro ao criar repositório:")
-        print(f"  {result.stderr.strip()}")
-        print(f"\n  O histórico git foi reiniciado. Crie o repo manualmente e rode:")
-        print(f"    git remote add origin <url> && git push -u origin main")
-
-
-def setup_secrets(app_name: str, gh_user: str = "") -> None:
-    repo_ref = f"{gh_user}/{app_name}" if gh_user else app_name
-    print("\n  " + "─" * 50)
-    configurar = input("  Configurar secrets de deploy no GitHub Actions? [s/N]: ").strip().lower()
-    if configurar != "s":
-        print(f"\n  Próximos passos:")
-        print(f"  1. Copie .env.production.example → .env.production e preencha os secrets")
-        print(f"  2. Configure as secrets de deploy: gh secret set DEPLOY_HOST etc.")
-        return
-
-    print("\n  Informe os dados de acesso à VPS:")
-    host = ask("IP ou hostname da VPS (DEPLOY_HOST)")
-    user = input("  Usuário SSH (DEPLOY_USER) [root]: ").strip() or "root"
-    path = ask("Caminho no servidor (DEPLOY_PATH, ex: /opt/petshop)")
-    port = input("  Porta SSH (DEPLOY_PORT) [22]: ").strip() or "22"
-
-    print("\n  Chave SSH privada:")
-    print("  (usada pelo GitHub Actions para acessar a VPS)")
-    while True:
-        key_path = input("  Caminho local da chave privada [~/.ssh/id_rsa]: ").strip() or "~/.ssh/id_rsa"
-        key_file = Path(key_path).expanduser()
-        if key_file.exists():
-            break
-        print(f"  Arquivo não encontrado: {key_file}")
-
-    print()
-    secrets = {
-        "DEPLOY_HOST": host,
-        "DEPLOY_USER": user,
-        "DEPLOY_PATH": path,
-        "DEPLOY_PORT": port,
-    }
-
-    ok = True
-    for name, value in secrets.items():
-        result = run(["gh", "secret", "set", name, "--repo", repo_ref, "--body", value], check=False)
-        if result.returncode == 0:
-            print(f"  ✓ {name}")
-        else:
-            print(f"  ✗ {name}: {result.stderr.strip()}")
-            ok = False
-
-    # SSH key via stdin para não expor no histórico do shell
-    key_content = key_file.read_text()
-    result = subprocess.run(
-        ["gh", "secret", "set", "DEPLOY_SSH_KEY", "--repo", repo_ref],
-        input=key_content,
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
-        print(f"  ✓ DEPLOY_SSH_KEY")
-    else:
-        print(f"  ✗ DEPLOY_SSH_KEY: {result.stderr.strip()}")
-        ok = False
-
-    print()
-    if ok:
-        print(f"  Secrets configuradas! O deploy para a VPS está pronto.")
-        print(f"\n  Próximo passo:")
-        print(f"  1. Copie .env.production.example → .env.production e preencha os secrets")
-        print(f"  2. Faça o primeiro deploy manual no servidor:")
-        print(f"     scp .env.production {user}@{host}:{path}/.env.production")
-        print(f"     ssh {user}@{host} 'cd {path} && ./deploy.sh'")
-    else:
-        print(f"  Algumas secrets falharam. Verifique e reconfigure manualmente com:")
-        print(f"  gh secret set <NOME> --repo {app_name}")
 
 
 if __name__ == "__main__":
