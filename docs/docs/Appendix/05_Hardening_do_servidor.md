@@ -61,19 +61,21 @@ A solução oficial do Docker para esse problema é a chain `DOCKER-USER`: ela �
 
 Criado um ipset com todos os CIDRs IPv4 e IPv6 da Cloudflare, e configurada a chain `DOCKER-USER` para:
 
-1. **ACCEPT** tráfego nas portas 80/443 vindo de IPs da Cloudflare
-2. **DROP** tráfego nas portas 80/443 vindo de qualquer outro IP
-3. **RETURN** para todo o resto (outras portas, tráfego interno Docker)
+1. **ACCEPT** pacotes pertencentes a conexões já estabelecidas (respostas de conexões saindo dos containers, ex: APIs externas, OAuth)
+2. **ACCEPT** tráfego nas portas 80/443 vindo de IPs da Cloudflare
+3. **DROP** tráfego nas portas 80/443 vindo de qualquer outro IP
+4. **RETURN** para todo o resto (outras portas, tráfego interno Docker)
 
-A correspondência usa `--ctorigdstport` do módulo `conntrack`, que captura a porta de destino **original** (antes do DNAT que o Docker aplica no PREROUTING). Sem isso, a porta vista na chain FORWARD seria a porta interna do container, não 80/443.
+A correspondência usa `--ctorigdstport` do módulo `conntrack`, que captura a porta de destino **original** (antes do DNAT que o Docker aplica no PREROUTING). Sem isso, a porta vista na chain FORWARD seria a porta interna do container, não 80/443. A regra `ESTABLISHED,RELATED` precisa vir **antes** das DROPs porque o conntrack também casa `ctorigdstport=443` em pacotes de retorno de conexões saindo dos containers — sem ela, respostas de serviços como `oauth2.googleapis.com` seriam derrubadas.
 
 ```
 Chain DOCKER-USER
-1  ACCEPT  tcp  ctorigdstport 80   match-set cloudflare-ipv4 src
-2  ACCEPT  tcp  ctorigdstport 443  match-set cloudflare-ipv4 src
-3  DROP    tcp  ctorigdstport 80
-4  DROP    tcp  ctorigdstport 443
-5  RETURN
+1  ACCEPT  tcp  ctstate ESTABLISHED,RELATED
+2  ACCEPT  tcp  ctorigdstport 80   match-set cloudflare-ipv4 src
+3  ACCEPT  tcp  ctorigdstport 443  match-set cloudflare-ipv4 src
+4  DROP    tcp  ctorigdstport 80
+5  DROP    tcp  ctorigdstport 443
+6  RETURN
 ```
 
 O mesmo esquema foi aplicado no `ip6tables` com o ipset `cloudflare-ipv6`.
