@@ -83,6 +83,13 @@ def build_replacements(app_name: str, backend_domain: str, frontend_domain: str)
         (OLD_REPO_NAME, app_name),
         (f"{OLD_CONTAINER_PREFIX}_", f"{app_name}_"),
         (f"--project-name {OLD_PROJECT_NAME}", f"--project-name {app_name}"),
+        # traefik router labels — must come before the generic OLD_APP replacement
+        ("routers.myapi.", f"routers.{app_name}-backend."),
+        ("services.myapi.", f"services.{app_name}-backend."),
+        ("middlewares.myapi-ratelimit.", f"middlewares.{app_name}-backend-ratelimit."),
+        ("middlewares=myapi-ratelimit", f"middlewares={app_name}-backend-ratelimit"),
+        ("routers.frontend.", f"routers.{app_name}-frontend."),
+        ("services.frontend.", f"services.{app_name}-frontend."),
         (OLD_APP, app_name),
     ]
 
